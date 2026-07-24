@@ -1,0 +1,538 @@
+<!doctype html>
+<!--
+  PROTOTYPE - throwaway. Do not ship.
+  Question: what should the Analysis result screen look like? (gh issue #1)
+  Three structurally different variants on one page, switchable via ?variant=A|B|C
+  or the floating bar / arrow keys. Styled only with docs/design/tokens.css.
+  Run: open prototype/analysis-result.html
+-->
+<html lang="en" data-mode="mobile">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inflectra - Analysis result prototype</title>
+<link rel="stylesheet" href="../docs/design/tokens.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-family-body), sans-serif;
+    background: var(--background-sunken);
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-24);
+  }
+
+  /* phone frame */
+  #frame {
+    width: 390px; height: 844px; max-height: 95vh;
+    background: var(--background-base);
+    border: 1px solid var(--stroke-weak);
+    border-radius: var(--radius-32);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  @media (max-width: 480px) {
+    body { padding: 0; }
+    #frame { width: 100%; height: 100%; max-height: none; border-radius: 0; border: none; }
+  }
+  #screen { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  /* shared bits */
+  .navbar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: var(--space-8);
+    padding: var(--space-12) var(--space-16);
+    background: color-mix(in srgb, var(--background-base) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--stroke-weak);
+  }
+  .navbar .back {
+    width: 32px; height: 32px; border-radius: var(--radius-full);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--fill-weak); color: var(--text-strong);
+    font-size: var(--text-body-size); text-decoration: none; cursor: pointer; border: none;
+  }
+  .navbar .title { flex: 1; text-align: center;
+    font-size: var(--text-body-size); font-weight: var(--font-weight-strong);
+    color: var(--text-strong); }
+  .navbar .spacer { width: 32px; }
+
+  .uppercase-label {
+    font-size: var(--text-uppercase-size); line-height: var(--text-uppercase-line);
+    font-weight: var(--font-weight-strong); letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-weak);
+  }
+  .body-text { font-size: var(--text-body-size); line-height: var(--text-body-line); color: var(--text-strong); }
+  .tiny-text { font-size: var(--text-tiny-size); line-height: var(--text-tiny-line); color: var(--text-weak); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-2) var(--space-12);
+    border-radius: var(--radius-full);
+    font-size: var(--text-tiny-size); line-height: var(--text-tiny-line);
+    font-weight: var(--font-weight-strong);
+  }
+  .pill.bullish { background: var(--fill-success-weak); color: var(--text-success); border: 1px solid var(--stroke-success-weak); }
+  .pill.bearish { background: var(--fill-error-weak); color: var(--text-error); border: 1px solid var(--stroke-error-weak); }
+  .pill.sideways { background: var(--fill-weak); color: var(--text-weak); border: 1px solid var(--stroke-weak); }
+  .pill.long { background: var(--fill-success-strong); color: var(--fill-white); }
+  .pill.short { background: var(--fill-error-strong); color: var(--fill-white); }
+  .pill.hold { background: var(--fill-strong); color: var(--background-base); }
+
+  .disclaimer {
+    text-align: center; padding: var(--space-16);
+    font-size: var(--text-tiny-size); line-height: var(--text-tiny-line);
+    color: var(--text-weak);
+  }
+
+  .confbar { height: 4px; border-radius: var(--radius-full); background: var(--fill-weak); overflow: hidden; }
+  .confbar > i { display: block; height: 100%; border-radius: var(--radius-full); background: var(--fill-brand-strong); }
+
+  /* ===== Variant A - verdict-first card stack ===== */
+  .va { padding: var(--space-16); display: flex; flex-direction: column; gap: var(--space-12); }
+  .va .hero {
+    background: var(--background-raised); border: 1px solid var(--stroke-weak);
+    border-radius: var(--radius-16); padding: var(--space-20); box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: var(--space-12);
+  }
+  .va .hero .toprow { display: flex; align-items: center; justify-content: space-between; }
+  .va .asset { font-size: var(--text-h4-size); line-height: var(--text-h4-line);
+    font-weight: var(--font-weight-strong); color: var(--text-strong); }
+  .va .card {
+    background: var(--background-raised); border: 1px solid var(--stroke-weak);
+    border-radius: var(--radius-16); padding: var(--space-16); box-shadow: var(--shadow-xs);
+    display: flex; flex-direction: column; gap: var(--space-12);
+  }
+  .va .chart-thumb { border-radius: var(--radius-12); overflow: hidden; border: 1px solid var(--stroke-weak); }
+  .va .chart-thumb svg { display: block; width: 100%; height: auto; }
+  .va .pattern-row { display: flex; align-items: center; gap: var(--space-12); }
+  .va .pattern-row .name { flex: 1; font-size: var(--text-body-size); color: var(--text-strong); text-transform: capitalize; }
+  .va .pattern-row .confbar { width: 96px; }
+  .va .pattern-row .pct { width: 40px; text-align: right; font-size: var(--text-tiny-size);
+    color: var(--text-weak); font-variant-numeric: tabular-nums; }
+  .va .levels { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-12); }
+  .va .levelbox { border-radius: var(--radius-12); padding: var(--space-12); display: flex; flex-direction: column; gap: var(--space-4); }
+  .va .levelbox.support { background: var(--fill-success-weak); border: 1px solid var(--stroke-success-weak); }
+  .va .levelbox.resistance { background: var(--fill-error-weak); border: 1px solid var(--stroke-error-weak); }
+  .va .levelbox .nums { font-size: var(--text-body-size); font-weight: var(--font-weight-strong);
+    color: var(--text-strong); font-variant-numeric: tabular-nums; }
+  .va .condition { display: flex; gap: var(--space-8); }
+  .va .condition .k { width: 88px; flex-shrink: 0; }
+  .va .strategy-card { border: 1px solid var(--stroke-brand-weak); background: var(--fill-brand-weak); }
+  .va .strategy-head { display: flex; align-items: center; justify-content: space-between; }
+  .va .sgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-8); }
+  .va .scell { background: var(--background-raised); border: 1px solid var(--stroke-weak);
+    border-radius: var(--radius-8); padding: var(--space-8) var(--space-12);
+    display: flex; flex-direction: column; gap: var(--space-2); }
+  .va .scell .v { font-size: var(--text-body-size); font-weight: var(--font-weight-strong);
+    color: var(--text-strong); font-variant-numeric: tabular-nums; }
+
+  /* ===== Variant B - trade ticket ===== */
+  .vb { display: flex; flex-direction: column; }
+  .vb .chart-strip { position: relative; border-bottom: 1px solid var(--stroke-weak); }
+  .vb .chart-strip svg { display: block; width: 100%; height: auto; }
+  .vb .chart-strip .asset-badge {
+    position: absolute; top: var(--space-12); left: var(--space-12);
+    background: var(--fill-strong); color: var(--background-base);
+    padding: var(--space-4) var(--space-12); border-radius: var(--radius-full);
+    font-size: var(--text-tiny-size); font-weight: var(--font-weight-strong);
+  }
+  .vb .ticket { padding: var(--space-16); display: flex; flex-direction: column; gap: var(--space-16); }
+  .vb .ticket-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .vb .ticket-head h2 { font-size: var(--text-h3-size); line-height: var(--text-h3-line);
+    font-weight: var(--font-weight-strong); color: var(--text-strong); }
+  .vb .ladder { display: flex; flex-direction: column; }
+  .vb .rung { display: flex; align-items: center; gap: var(--space-16); padding: var(--space-12) 0; }
+  .vb .rung + .rung { border-top: 1px dashed var(--stroke-weak); }
+  .vb .rung .dot { width: 10px; height: 10px; border-radius: var(--radius-full); flex-shrink: 0; }
+  .vb .rung.tp .dot { background: var(--fill-success-strong); }
+  .vb .rung.entry .dot { background: var(--fill-brand-strong); box-shadow: 0 0 0 4px var(--stroke-brand-weak); }
+  .vb .rung.sl .dot { background: var(--fill-error-strong); }
+  .vb .rung .lbl { flex: 1; display: flex; flex-direction: column; }
+  .vb .rung .lbl .main { font-size: var(--text-tiny-size); line-height: var(--text-tiny-line);
+    color: var(--text-strong); font-weight: var(--weight-medium); }
+  .vb .rung .lbl .sub { font-size: var(--text-tiny-size); line-height: var(--text-tiny-line); color: var(--text-weak); }
+  .vb .head-group { display: flex; flex-direction: column; gap: var(--space-4); }
+  .vb .ladder-note { font-size: var(--text-tiny-size); line-height: var(--text-tiny-line); color: var(--text-weak); }
+  .vb .rung .price { font-size: var(--text-h4-size); font-weight: var(--font-weight-strong);
+    color: var(--text-strong); font-variant-numeric: tabular-nums; }
+  .vb .rung .delta { width: 64px; text-align: right; font-size: var(--text-tiny-size); font-variant-numeric: tabular-nums; }
+  .vb .rung.tp .delta { color: var(--text-success); }
+  .vb .rung.sl .delta { color: var(--text-error); }
+  .vb .rung.entry .delta { color: var(--text-weak); }
+  .vb .conf-row { display: flex; align-items: center; gap: var(--space-12); }
+  .vb .conf-row .confbar { flex: 1; }
+  .vb .rationale {
+    background: var(--background-alternate); border-radius: var(--radius-12);
+    padding: var(--space-12) var(--space-16);
+    font-size: var(--text-tiny-size); line-height: var(--text-tiny-line); color: var(--text-weak);
+  }
+  .vb details {
+    border-top: 1px solid var(--stroke-weak);
+  }
+  .vb details summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--space-16);
+    font-size: var(--text-body-size); font-weight: var(--font-weight-strong); color: var(--text-strong);
+  }
+  .vb details summary::-webkit-details-marker { display: none; }
+  .vb details summary::after { content: "+"; color: var(--icon-neutral); font-weight: var(--font-weight-weak); }
+  .vb details[open] summary::after { content: "\2212"; }
+  .vb details .inner { padding: 0 var(--space-16) var(--space-16); display: flex; flex-direction: column; gap: var(--space-12); }
+  .vb .kv { display: flex; gap: var(--space-8); font-size: var(--text-tiny-size); line-height: var(--text-tiny-line); }
+  .vb .kv .k { width: 96px; flex-shrink: 0; color: var(--text-weak); }
+  .vb .kv .v { color: var(--text-strong); }
+  .vb .tagrow { display: flex; flex-wrap: wrap; gap: var(--space-8); }
+  .vb .tag { border: 1px solid var(--stroke-weak); border-radius: var(--radius-full);
+    padding: var(--space-2) var(--space-12); font-size: var(--text-tiny-size);
+    color: var(--text-strong); text-transform: capitalize; }
+  .vb .tag b { color: var(--text-weak); font-weight: var(--font-weight-weak); }
+
+  /* ===== Variant C - annotated chart ===== */
+  .vc { display: flex; flex-direction: column; }
+  .vc .chart-hero { position: relative; background: var(--background-alternate); }
+  .vc .chart-hero svg { display: block; width: 100%; height: auto; }
+  .vc .hero-meta {
+    position: absolute; left: var(--space-16); bottom: var(--space-12);
+    display: flex; align-items: center; gap: var(--space-8);
+  }
+  .vc .hero-meta .asset-badge {
+    background: var(--fill-strong); color: var(--background-base);
+    padding: var(--space-4) var(--space-12); border-radius: var(--radius-full);
+    font-size: var(--text-tiny-size); font-weight: var(--font-weight-strong);
+  }
+  .vc .chips {
+    display: flex; gap: var(--space-8); overflow-x: auto; padding: var(--space-12) var(--space-16);
+    border-bottom: 1px solid var(--stroke-weak); scrollbar-width: none;
+  }
+  .vc .chips::-webkit-scrollbar { display: none; }
+  .vc .chip {
+    flex-shrink: 0; display: flex; flex-direction: column; gap: var(--space-2);
+    background: var(--background-raised); border: 1px solid var(--stroke-weak);
+    border-radius: var(--radius-12); padding: var(--space-8) var(--space-12); min-width: 96px;
+  }
+  .vc .chip .v { font-size: var(--text-tiny-size); font-weight: var(--font-weight-strong); color: var(--text-strong); }
+  .vc .prose { padding: var(--space-16); display: flex; flex-direction: column; gap: var(--space-16); }
+  .vc .patterns { display: flex; flex-direction: column; gap: var(--space-8); }
+  .vc .pat { display: flex; align-items: center; gap: var(--space-12); }
+  .vc .pat .name { font-size: var(--text-body-size); color: var(--text-strong); text-transform: capitalize; flex: 1; }
+  .vc .pat .confbar { width: 120px; }
+  .vc .strategy-sheet {
+    position: sticky; bottom: 0; margin-top: auto;
+    background: var(--background-overlay);
+    border-top: 1px solid var(--border-weak-overlay);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-20) var(--radius-20) 0 0;
+    padding: var(--space-16);
+    display: flex; flex-direction: column; gap: var(--space-12);
+  }
+  .vc .sheet-head { display: flex; align-items: center; gap: var(--space-12); }
+  .vc .sheet-head .title { flex: 1; font-size: var(--text-body-size);
+    font-weight: var(--font-weight-strong); color: var(--text-strong); }
+  .vc .sheet-nums { display: flex; gap: var(--space-16); }
+  .vc .sheet-nums .cell { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
+  .vc .sheet-nums .v { font-size: var(--text-body-size); font-weight: var(--font-weight-strong);
+    color: var(--text-strong); font-variant-numeric: tabular-nums; }
+
+  /* ===== floating prototype switcher (not part of the design) ===== */
+  #proto-bar {
+    position: fixed; bottom: var(--space-24); left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: var(--space-4);
+    background: var(--fill-strong); color: var(--background-base);
+    border-radius: var(--radius-full); padding: var(--space-4);
+    box-shadow: var(--shadow-xl); user-select: none;
+  }
+  #proto-bar button {
+    width: 36px; height: 36px; border: none; border-radius: var(--radius-full);
+    background: transparent; color: inherit; font-size: var(--text-body-size); cursor: pointer;
+  }
+  #proto-bar button:hover { background: var(--fill-inverse-weak); }
+  #proto-bar .label { min-width: 180px; text-align: center;
+    font-size: var(--text-tiny-size); font-weight: var(--font-weight-strong); }
+</style>
+</head>
+<body>
+<div id="frame"><div id="screen"></div></div>
+<div id="proto-bar">
+  <button id="prev" title="Previous variant">&#8592;</button>
+  <span class="label" id="proto-label"></span>
+  <button id="next" title="Next variant">&#8594;</button>
+  <button id="theme" title="Toggle dark mode">&#9681;</button>
+</div>
+
+<script>
+// fake Analysis payload, matching the contract in gh issue #1
+const analysis = {
+  is_chart: true,
+  asset_guess: "BTC/USD 4h",
+  summary: "The price has been climbing in small steps. Every time it drops, it stops at a higher point than before. But it struggles to get past 64,500. This shape is called an ascending triangle, and it often means the price will break upward. The AI expects that here, as long as the price stays above 59,800.",
+  trend: "bullish",
+  patterns: [
+    { name: "ascending triangle", confidence: 0.8 },
+    { name: "bull flag", confidence: 0.62 },
+    { name: "higher lows structure", confidence: 0.74 },
+  ],
+  support_levels: [61200, 59800],
+  resistance_levels: [64500, 67000],
+  volatility: "The price is moving in smaller and smaller steps. That often happens right before a bigger move.",
+  volume_read: "Fewer people are trading right now. Activity picks up when the price rises, which suggests buyers are slowly buying more.",
+  sentiment: "Mildly positive. Buyers return quickly every time the price dips, but rises keep stopping at 64,500.",
+  strategy: {
+    direction: "long",
+    entry: 62800,
+    stop_loss: 59500,
+    take_profit: [64500, 67000],
+    confidence: 0.7,
+    rationale: "The chart pattern points up, so the AI suggests buying near 62,800. If the price falls to 59,500, sell everything - you lose about 5% at most. If the price rises, sell at 64,500 and sell the rest at 67,000.",
+  },
+  created_at: "2026-07-24T09:41:00Z",
+};
+
+const fmt = n => n.toLocaleString("en-US");
+const pct = c => Math.round(c * 100) + "%";
+const trendArrow = { bullish: "↗", bearish: "↘", sideways: "→" };
+const trendWord = { bullish: "Rising", bearish: "Falling", sideways: "Flat" };
+
+// deterministic candlestick mock so all variants render an identical "photo"
+function candles() {
+  let seed = 42;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const out = [];
+  let price = 59400;
+  for (let i = 0; i < 44; i++) {
+    const drift = i < 30 ? 160 : 20;              // uptrend then coil under resistance
+    const change = (rnd() - 0.42) * 900 + drift;
+    const open = price, close = Math.min(64350, open + change);
+    const hi = Math.max(open, close) + rnd() * 500;
+    const lo = Math.min(open, close) - rnd() * 500;
+    out.push({ open, close, hi, lo });
+    price = close;
+  }
+  return out;
+}
+const CANDLES = candles();
+
+// shared mock chart; overlay=true draws S/R lines mapped to real prices
+function chartSvg({ w, h, overlay = false }) {
+  const lo = 57800, hi = 68200;
+  const y = p => h - ((p - lo) / (hi - lo)) * h;
+  const cw = w / CANDLES.length;
+  let body = "";
+  CANDLES.forEach((c, i) => {
+    const x = i * cw + cw / 2;
+    const up = c.close >= c.open;
+    const col = up ? "var(--fill-success-strong)" : "var(--fill-error-strong)";
+    body += `<line x1="${x}" y1="${y(c.hi)}" x2="${x}" y2="${y(c.lo)}" stroke="${col}" stroke-width="1"/>`;
+    body += `<rect x="${x - cw * 0.3}" y="${y(Math.max(c.open, c.close))}" width="${cw * 0.6}"
+      height="${Math.max(2, Math.abs(y(c.open) - y(c.close)))}" fill="${col}" rx="1"/>`;
+  });
+  let lines = "";
+  if (overlay) {
+    const lvl = (p, cls) => {
+      const col = cls === "s" ? "var(--stroke-success-strong)" : "var(--stroke-error-strong)";
+      const bg = cls === "s" ? "var(--fill-success-strong)" : "var(--fill-error-strong)";
+      return `<line x1="0" y1="${y(p)}" x2="${w}" y2="${y(p)}" stroke="${col}" stroke-width="1" stroke-dasharray="4 4"/>
+        <rect x="${w - 58}" y="${y(p) - 9}" width="54" height="18" rx="9" fill="${bg}"/>
+        <text x="${w - 31}" y="${y(p) + 4}" text-anchor="middle" font-size="10" font-weight="600"
+          fill="var(--fill-white)" font-family="Inter">${fmt(p)}</text>`;
+    };
+    lines = analysis.support_levels.map(p => lvl(p, "s")).join("") +
+            analysis.resistance_levels.map(p => lvl(p, "r")).join("");
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="background:var(--background-alternate)">
+    ${body}${lines}</svg>`;
+}
+
+const trendPill = `<span class="pill ${analysis.trend}">${trendArrow[analysis.trend]} ${trendWord[analysis.trend]}</span>`;
+const dirPill = `<span class="pill ${analysis.strategy.direction}">${analysis.strategy.direction.toUpperCase()}</span>`;
+const navbar = `<div class="navbar"><button class="back">&#8249;</button>
+  <span class="title">Analysis</span><span class="spacer"></span></div>`;
+const disclaimer = `<div class="disclaimer">This is for learning, not financial advice. Inflectra never trades for you.</div>`;
+
+/* Variant A - "Verdict first": prose summary leads, everything else is a stacked
+   card per section, strategy last as the conclusion. */
+function VariantA() {
+  const s = analysis.strategy;
+  return `${navbar}<div class="va">
+    <div class="hero">
+      <div class="toprow"><span class="asset">${analysis.asset_guess}</span>${trendPill}</div>
+      <p class="body-text">${analysis.summary}</p>
+      <div class="chart-thumb">${chartSvg({ w: 340, h: 130 })}</div>
+    </div>
+    <div class="card">
+      <span class="uppercase-label">Patterns</span>
+      ${analysis.patterns.map(p => `<div class="pattern-row"><span class="name">${p.name}</span>
+        <span class="confbar"><i style="width:${pct(p.confidence)}"></i></span>
+        <span class="pct">${pct(p.confidence)}</span></div>`).join("")}
+    </div>
+    <div class="card">
+      <span class="uppercase-label">Key levels</span>
+      <div class="levels">
+        <div class="levelbox support"><span class="tiny-text">Support</span>
+          <span class="nums">${analysis.support_levels.map(fmt).join(" &middot; ")}</span></div>
+        <div class="levelbox resistance"><span class="tiny-text">Resistance</span>
+          <span class="nums">${analysis.resistance_levels.map(fmt).join(" &middot; ")}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <span class="uppercase-label">Market conditions</span>
+      <div class="condition"><span class="tiny-text k">Volatility</span><span class="tiny-text" style="color:var(--text-strong)">${analysis.volatility}</span></div>
+      <div class="condition"><span class="tiny-text k">Volume</span><span class="tiny-text" style="color:var(--text-strong)">${analysis.volume_read}</span></div>
+      <div class="condition"><span class="tiny-text k">Sentiment</span><span class="tiny-text" style="color:var(--text-strong)">${analysis.sentiment}</span></div>
+    </div>
+    <div class="card strategy-card">
+      <div class="strategy-head"><span class="uppercase-label" style="color:var(--text-brand)">Strategy</span>${dirPill}</div>
+      <div class="sgrid">
+        <div class="scell"><span class="tiny-text">Entry</span><span class="v">${fmt(s.entry)}</span></div>
+        <div class="scell"><span class="tiny-text">Stop</span><span class="v">${fmt(s.stop_loss)}</span></div>
+        <div class="scell"><span class="tiny-text">Confidence</span><span class="v">${pct(s.confidence)}</span></div>
+      </div>
+      <div class="sgrid" style="grid-template-columns:1fr">
+        <div class="scell"><span class="tiny-text">Take profit</span><span class="v">${s.take_profit.map(fmt).join(" &rarr; ")}</span></div>
+      </div>
+      <p class="tiny-text">${s.rationale}</p>
+    </div>
+    ${disclaimer}
+  </div>`;
+}
+
+/* Variant B - "Trade ticket": the strategy IS the screen. Price ladder up top,
+   all analysis context demoted to accordions underneath. */
+function VariantB() {
+  const s = analysis.strategy;
+  const d = p => {
+    const v = ((p - s.entry) / s.entry) * 100;
+    return (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+  };
+  const rung = (cls, label, term, price) => `<div class="rung ${cls}"><span class="dot"></span>
+    <span class="lbl"><span class="main">${label}</span><span class="sub">${term}</span></span>
+    <span class="price">${fmt(price)}</span>
+    <span class="delta">${d(price)}</span></div>`;
+  const dirCopy = {
+    long: { headline: "Buy", verb: "buy", sub: "The AI thinks the price will go up." },
+    short: { headline: "Sell", verb: "sell", sub: "The AI thinks the price will go down." },
+    hold: { headline: "Wait", verb: "wait", sub: "The AI suggests waiting for a clearer signal." },
+  }[s.direction];
+  return `${navbar}<div class="vb">
+    <div class="chart-strip">${chartSvg({ w: 390, h: 150 })}
+      <span class="asset-badge">${analysis.asset_guess}</span></div>
+    <div class="ticket">
+      <div class="ticket-head"><div class="head-group"><h2>${dirCopy.headline}</h2>
+        <span class="tiny-text">${dirCopy.sub}</span></div>${trendPill}</div>
+      <div class="ladder">
+        ${[...s.take_profit].reverse().map((tp, i) => {
+          const n = s.take_profit.length - i;
+          return rung("tp", "Sell target " + n,
+            n === 1 ? "Sell here first to lock in gains" : "If it keeps climbing, sell the rest here", tp);
+        }).join("")}
+        ${rung("entry", "Buy at this price", "This is where the trade starts", s.entry)}
+        ${rung("sl", "Emergency exit", "If the price falls this low, sell to stop the loss", s.stop_loss)}
+      </div>
+      <p class="ladder-note">Each percentage shows your gain or loss compared to the buy price.</p>
+      <div class="conf-row"><span class="tiny-text">How sure is the AI?</span>
+        <span class="confbar"><i style="width:${pct(s.confidence)}"></i></span>
+        <span class="tiny-text" style="color:var(--text-strong)">${pct(s.confidence)}</span></div>
+      <div class="rationale">${s.rationale}</div>
+    </div>
+    <details open><summary>Why the AI says ${dirCopy.verb}</summary><div class="inner">
+      <p class="tiny-text" style="color:var(--text-strong)">${analysis.summary}</p>
+    </div></details>
+    <details><summary>Shapes in the chart (${analysis.patterns.length})</summary><div class="inner">
+      <p class="tiny-text">The AI found shapes in the chart that hint where the price may go next. The percentage shows how sure it is about each one.</p>
+      <div class="tagrow">${analysis.patterns.map(p => `<span class="tag">${p.name} <b>${pct(p.confidence)}</b></span>`).join("")}</div>
+    </div></details>
+    <details><summary>Key prices &amp; market mood</summary><div class="inner">
+      <p class="tiny-text">The price tends to bounce up from the floor and stop at the ceiling.</p>
+      <div class="kv"><span class="k">Price floor</span><span class="v">${analysis.support_levels.map(fmt).join(", ")}</span></div>
+      <div class="kv"><span class="k">Price ceiling</span><span class="v">${analysis.resistance_levels.map(fmt).join(", ")}</span></div>
+      <div class="kv"><span class="k">Price swings</span><span class="v">${analysis.volatility}</span></div>
+      <div class="kv"><span class="k">Trading activity</span><span class="v">${analysis.volume_read}</span></div>
+      <div class="kv"><span class="k">Market mood</span><span class="v">${analysis.sentiment}</span></div>
+    </div></details>
+    ${disclaimer}
+  </div>`;
+}
+
+/* Variant C - "Annotated chart": the chart dominates with S/R drawn on it,
+   stats as a chip rail, prose below, strategy pinned as a bottom sheet. */
+function VariantC() {
+  const s = analysis.strategy;
+  return `${navbar}<div class="vc" style="min-height:100%">
+    <div class="chart-hero">${chartSvg({ w: 390, h: 240, overlay: true })}
+      <div class="hero-meta"><span class="asset-badge">${analysis.asset_guess}</span>${trendPill}</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="tiny-text">Trend</span><span class="v" style="text-transform:capitalize">${trendArrow[analysis.trend]} ${analysis.trend}</span></div>
+      <div class="chip"><span class="tiny-text">Volatility</span><span class="v">Contracting</span></div>
+      <div class="chip"><span class="tiny-text">Volume</span><span class="v">Declining</span></div>
+      <div class="chip"><span class="tiny-text">Sentiment</span><span class="v">Optimistic</span></div>
+      <div class="chip"><span class="tiny-text">Patterns</span><span class="v">${analysis.patterns.length} found</span></div>
+    </div>
+    <div class="prose">
+      <p class="body-text">${analysis.summary}</p>
+      <div class="patterns">
+        <span class="uppercase-label">Patterns</span>
+        ${analysis.patterns.map(p => `<div class="pat"><span class="name">${p.name}</span>
+          <span class="confbar"><i style="width:${pct(p.confidence)}"></i></span></div>`).join("")}
+      </div>
+      <div>
+        <span class="uppercase-label">Conditions</span>
+        <p class="tiny-text" style="margin-top:var(--space-8)">${analysis.volatility}<br>${analysis.volume_read}<br>${analysis.sentiment}</p>
+      </div>
+      ${disclaimer}
+    </div>
+    <div class="strategy-sheet">
+      <div class="sheet-head">${dirPill}<span class="title">Entry ${fmt(s.entry)} &middot; ${pct(s.confidence)} confidence</span></div>
+      <div class="sheet-nums">
+        <div class="cell"><span class="tiny-text">Stop loss</span><span class="v" style="color:var(--text-error)">${fmt(s.stop_loss)}</span></div>
+        <div class="cell"><span class="tiny-text">Target 1</span><span class="v" style="color:var(--text-success)">${fmt(s.take_profit[0])}</span></div>
+        <div class="cell"><span class="tiny-text">Target 2</span><span class="v" style="color:var(--text-success)">${fmt(s.take_profit[1])}</span></div>
+      </div>
+      <p class="tiny-text">${s.rationale}</p>
+    </div>
+  </div>`;
+}
+
+// switcher
+const variants = [
+  { key: "A", name: "Verdict first", render: VariantA },
+  { key: "B", name: "Trade ticket", render: VariantB },
+  { key: "C", name: "Annotated chart", render: VariantC },
+];
+function currentKey() {
+  const k = new URLSearchParams(location.search).get("variant");
+  return variants.some(v => v.key === k) ? k : "A";
+}
+function show(key) {
+  const v = variants.find(x => x.key === key);
+  document.getElementById("screen").innerHTML = v.render();
+  document.getElementById("screen").scrollTop = 0;
+  document.getElementById("proto-label").textContent = `${v.key} — ${v.name}`;
+  const url = new URL(location);
+  url.searchParams.set("variant", key);
+  history.replaceState(null, "", url);
+}
+function cycle(dir) {
+  const i = variants.findIndex(v => v.key === currentKey());
+  show(variants[(i + dir + variants.length) % variants.length].key);
+}
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === "dark" ? "" : "dark";
+};
+document.addEventListener("keydown", e => {
+  if (/input|textarea/i.test(e.target.tagName) || e.target.isContentEditable) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark";
+show(currentKey());
+</script>
+</body>
+</html>
