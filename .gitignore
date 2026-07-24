@@ -43,3 +43,6 @@ example
 /android
 
 .obsidian
+
+# Supabase CLI local state
+supabase/.temp/
