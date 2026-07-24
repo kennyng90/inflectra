@@ -4,8 +4,25 @@ import { useEffect } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 
 import { useInterFonts } from '@/hooks/use-inter-fonts';
+import { AuthProvider, useAuth } from '@/lib/auth';
 import { startServerConnectionCheck } from '@/lib/use-server-connection';
 import { themeForScheme } from '@/theme';
+
+function RootStack() {
+  const { session, isReady } = useAuth();
+
+  if (!isReady) return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={session !== null}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+      </Stack.Protected>
+      <Stack.Screen name="sign-in" />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const fontsReady = useInterFonts();
@@ -38,10 +55,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
-      </Stack>
+      <AuthProvider>
+        <RootStack />
+      </AuthProvider>
     </ThemeProvider>
   );
 }
