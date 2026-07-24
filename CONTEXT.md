@@ -2,6 +2,10 @@
 
 AI-powered trading chart analysis app (personal-use build of the ChartDetector AI concept): the user submits a chart image, an AI returns a structured analysis.
 
+## Copy
+
+All user-facing text is written with the `/ux-writing` skill and must be understandable for someone with zero trading knowledge: plain everyday words, short sentences, trading jargon only as secondary reference and defined inline ("This shape is called an ascending triangle..."). Examples of the preferred register: "Buy at this price", "Emergency exit", "How sure is the AI?", trend as Rising/Falling/Flat rather than bullish/bearish. This applies to AI-generated text too - the `analyze-chart` prompt must enforce the same style. See the verdict on issue #1 for the full vocabulary.
+
 ## Language
 
 **Chart**:
