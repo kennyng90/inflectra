@@ -79,7 +79,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Inflectra needs your photos so you can pick a chart screenshot to analyze."
+          "photosPermission": "Inflectra needs your photos so you can pick a chart screenshot to analyze.",
+          "cameraPermission": "Inflectra needs your camera so you can take a photo of a chart on a screen.",
+          "microphonePermission": false
         }
       ]
     ],
