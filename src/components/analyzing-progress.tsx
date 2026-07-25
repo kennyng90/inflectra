@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { analyzingStage, STAGE_COUNT, type AnalyzeStep } from '@/lib/analyzing-copy';
 import { useTheme } from '@/theme';
@@ -26,18 +26,18 @@ export function AnalyzingProgress({ step, startedAt }: { step: AnalyzeStep; star
 
   return (
     <View
+      /* Same card as a Rejection: the Chart shows through behind it, so the
+         copy needs its own surface to stay readable over a dark screenshot. */
       style={{
-        alignItems: 'center',
-        gap: theme.spacing.space12,
-        padding: theme.spacing.space24,
-        /* The Chart shows through behind this, so the copy needs its own
-           surface to stay readable over a dark screenshot. */
-        maxWidth: CARD_MAX_WIDTH,
-        backgroundColor: theme.colors.backgroundRaised,
-        borderRadius: theme.radius.r16,
-        borderWidth: 1,
-        borderColor: theme.colors.strokeWeak,
         ...theme.elevation.md,
+        alignItems: 'center',
+        maxWidth: CARD_MAX_WIDTH,
+        gap: theme.spacing.space8,
+        padding: theme.spacing.space20,
+        borderRadius: theme.radius.r12,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.strokeWeak,
+        backgroundColor: theme.colors.backgroundRaised,
       }}>
       <ActivityIndicator size="small" color={theme.colors.interactiveAction} />
 

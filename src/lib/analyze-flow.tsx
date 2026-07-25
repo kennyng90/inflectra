@@ -17,8 +17,10 @@ export type CompletedAnalysis = { analysis: Analysis; chartUri: string };
 type AnalyzeFlow = {
   phase: AnalyzePhase;
   chart: PickedChart | null;
-  /* Rejection reason when rejected, error message when failed. */
-  message: string | null;
+  /* The AI's reason for turning the Chart down. */
+  rejection: string | null;
+  /* Why the analysis never finished. */
+  error: string | null;
   completed: CompletedAnalysis | null;
   /* Where the in-flight run has got to, and when that step began, so the wait
      can show staged progress. */
@@ -38,22 +40,28 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id ?? null;
   const [phase, setPhase] = useState<AnalyzePhase>('idle');
   const [chart, setChart] = useState<PickedChart | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<CompletedAnalysis | null>(null);
   const [step, setStep] = useState<AnalyzeStep>('preparing');
   const [stepStartedAt, setStepStartedAt] = useState(0);
   const runRef = useRef<AbortController | null>(null);
 
   const value = useMemo<AnalyzeFlow>(() => {
+    const clearVerdict = () => {
+      setRejection(null);
+      setError(null);
+    };
+
     const pickChart = (next: PickedChart) => {
       setChart(next);
-      setMessage(null);
+      clearVerdict();
       setPhase('ready');
     };
 
     const fail = (reason: string) => {
       setPhase('failed');
-      setMessage(reason);
+      setError(reason);
       return false;
     };
 
@@ -63,7 +71,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       const run = new AbortController();
       runRef.current = run;
       setPhase('analyzing');
-      setMessage(null);
+      clearVerdict();
       setStep('preparing');
       setStepStartedAt(Date.now());
       try {
@@ -76,7 +84,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
         });
         if (isRejection(result)) {
           setPhase('rejected');
-          setMessage(result.reason);
+          setRejection(result.reason);
           return false;
         }
         setCompleted({ analysis: result, chartUri: chart.uri });
@@ -98,8 +106,19 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
 
     const cancel = () => runRef.current?.abort();
 
-    return { phase, chart, message, completed, step, stepStartedAt, pickChart, submit, cancel };
-  }, [phase, chart, message, completed, step, stepStartedAt, userId]);
+    return {
+      phase,
+      chart,
+      rejection,
+      error,
+      completed,
+      step,
+      stepStartedAt,
+      pickChart,
+      submit,
+      cancel,
+    };
+  }, [phase, chart, rejection, error, completed, step, stepStartedAt, userId]);
 
   return <AnalyzeFlowContext.Provider value={value}>{children}</AnalyzeFlowContext.Provider>;
 }

@@ -2,13 +2,15 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button } from '@/components/button';
+import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
+import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { useTheme } from '@/theme';
@@ -18,17 +20,17 @@ const PICK_ERROR = "We couldn't open your photos. Try again.";
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { phase, chart, message, step, stepStartedAt, pickChart, submit, cancel } =
+  const { phase, chart, rejection, error, step, stepStartedAt, pickChart, submit, cancel } =
     useAnalyzeFlow();
   const [pickError, setPickError] = useState<string | null>(null);
 
   const analyzing = phase === 'analyzing';
-  const failed = phase === 'failed';
   const rejected = phase === 'rejected';
-  const errorMessage = pickError ?? (failed ? message : null);
+  const failed = phase === 'failed';
+  const errorMessage = pickError ?? error;
 
   /* Two stacked buttons. The actions area keeps that height in every phase so
-     the Chart preview above it never jumps mid-analysis. */
+     the Chart preview above it never jumps when an overlay appears. */
   const buttonHeight = theme.spacing.space12 * 2 + theme.lineHeight.body;
   const actionsMinHeight = buttonHeight * 2 + theme.spacing.space12;
 
@@ -76,13 +78,18 @@ export default function AnalyzeScreen() {
               flex: 1,
               borderRadius: theme.radius.r12,
               backgroundColor: theme.colors.backgroundAlternate,
-              opacity: analyzing ? 0.3 : 1,
+              opacity: analyzing || rejected ? 0.3 : 1,
             }}
           />
           {analyzing && (
-            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+            <ChartOverlay>
               <AnalyzingProgress step={step} startedAt={stepStartedAt} />
-            </View>
+            </ChartOverlay>
+          )}
+          {rejected && (
+            <ChartOverlay>
+              <RejectionNotice reason={rejection} />
+            </ChartOverlay>
           )}
         </View>
       )}
@@ -100,18 +107,6 @@ export default function AnalyzeScreen() {
         ) : (
           <>
             {errorMessage && <ErrorNotice message={errorMessage} />}
-
-            {rejected && message && (
-              <Text
-                accessibilityRole="alert"
-                style={{
-                  ...theme.text.small,
-                  color: theme.colors.textStrong,
-                  textAlign: 'center',
-                }}>
-                {message}
-              </Text>
-            )}
 
             {chart === null && <Button label="Choose a chart" onPress={pick} />}
 
