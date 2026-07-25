@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { analysisResultSchema, type AnalysisResult } from '@/lib/analysis-contract';
 import { type AnalyzeStep } from '@/lib/analyzing-copy';
 import { supabase } from '@/lib/supabase';
+import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
 
 /* Longest edge the app uploads: enough detail for the AI to read price levels,
    small enough to keep uploads and analysis fast. */
@@ -17,6 +18,7 @@ const JPEG_QUALITY = 0.8;
 
 export const GENERIC_ANALYZE_ERROR =
   "The analysis didn't go through. Check your connection and try again.";
+
 
 /* An expected failure whose message is safe to show the user as-is. */
 export class AnalyzeError extends Error {
@@ -41,7 +43,6 @@ export class CanceledError extends Error {
 export function isCanceled(error: unknown): boolean {
   return error instanceof CanceledError;
 }
-
 export type PickedChart = { uri: string; width: number; height: number };
 
 /* Dimensions to shrink to, or null when the Chart already fits. Only one edge
@@ -135,9 +136,7 @@ export async function analyzeChart(
   { signal, onStep }: AnalyzeOptions = {},
 ): Promise<AnalysisResult> {
   const client = supabase;
-  if (!client) {
-    throw new AnalyzeError("The server connection isn't set up yet. Restart the app and retry.");
-  }
+  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
 
   onStep?.('preparing');
   const preparedUri = await prepareChart(chart);
@@ -187,13 +186,13 @@ export async function analyzeChart(
   if (error) {
     const message = await serverErrorMessage(error);
     await discardChart();
-    throw new AnalyzeError(message);
+    throw new UserFacingError(message);
   }
 
   const parsed = analysisResultSchema.safeParse(data);
   if (!parsed.success) {
     await discardChart();
-    throw new AnalyzeError("The AI's answer came back garbled. Try again.");
+    throw new UserFacingError("The AI's answer came back garbled. Try again.");
   }
   if (!parsed.data.is_chart) await discardChart();
   return parsed.data;
