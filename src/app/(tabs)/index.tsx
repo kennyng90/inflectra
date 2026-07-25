@@ -2,11 +2,13 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { useTheme } from '@/theme';
@@ -16,12 +18,19 @@ const PICK_ERROR = "We couldn't open your photos. Try again.";
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { phase, chart, message, pickChart, submit } = useAnalyzeFlow();
+  const { phase, chart, message, step, stepStartedAt, pickChart, submit, cancel } =
+    useAnalyzeFlow();
   const [pickError, setPickError] = useState<string | null>(null);
 
   const analyzing = phase === 'analyzing';
-  const note = pickError ?? message;
-  const noteIsError = pickError !== null || phase === 'failed';
+  const failed = phase === 'failed';
+  const rejected = phase === 'rejected';
+  const errorMessage = pickError ?? (failed ? message : null);
+
+  /* Two stacked buttons. The actions area keeps that height in every phase so
+     the Chart preview above it never jumps mid-analysis. */
+  const buttonHeight = theme.spacing.space12 * 2 + theme.lineHeight.body;
+  const actionsMinHeight = buttonHeight * 2 + theme.spacing.space12;
 
   const pick = async () => {
     setPickError(null);
@@ -39,6 +48,7 @@ export default function AnalyzeScreen() {
   };
 
   const analyze = async () => {
+    setPickError(null);
     if (await submit()) router.push('/analysis');
   };
 
@@ -70,35 +80,8 @@ export default function AnalyzeScreen() {
             }}
           />
           {analyzing && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.space12,
-                  padding: theme.spacing.space20,
-                },
-              ]}>
-              <ActivityIndicator size="large" color={theme.colors.interactiveAction} />
-              <Text
-                accessibilityRole="alert"
-                style={{
-                  ...theme.text.body,
-                  fontWeight: theme.fontWeight.strong,
-                  color: theme.colors.textStrong,
-                  textAlign: 'center',
-                }}>
-                Reading your chart…
-              </Text>
-              <Text
-                style={{
-                  ...theme.text.small,
-                  color: theme.colors.textWeak,
-                  textAlign: 'center',
-                }}>
-                This usually takes under a minute.
-              </Text>
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+              <AnalyzingProgress step={step} startedAt={stepStartedAt} />
             </View>
           )}
         </View>
@@ -109,40 +92,39 @@ export default function AnalyzeScreen() {
           padding: theme.spacing.space20,
           paddingBottom: theme.spacing.space24,
           gap: theme.spacing.space12,
+          justifyContent: 'flex-end',
+          ...(chart === null ? {} : { minHeight: actionsMinHeight }),
         }}>
-        {note && !analyzing && (
-          <Text
-            accessibilityRole="alert"
-            style={{
-              ...theme.text.small,
-              color: noteIsError ? theme.colors.textError : theme.colors.textStrong,
-              textAlign: 'center',
-            }}>
-            {note}
-          </Text>
-        )}
-
-        {chart === null && <Button label="Choose a chart" onPress={pick} />}
-
-        {chart !== null && phase === 'rejected' && (
-          <Button label="Pick a different chart" onPress={pick} />
-        )}
-
-        {/* Kept mounted while analyzing so the preview doesn't jump; the
-            overlay carries the progress, so no second spinner here. */}
-        {chart !== null && phase !== 'rejected' && (
+        {analyzing ? (
+          <Button label="Cancel" variant="secondary" onPress={cancel} />
+        ) : (
           <>
-            <Button
-              label={phase === 'failed' ? 'Try again' : 'Analyze this chart'}
-              disabled={analyzing}
-              onPress={analyze}
-            />
-            <Button
-              label="Pick a different chart"
-              variant="secondary"
-              disabled={analyzing}
-              onPress={pick}
-            />
+            {errorMessage && <ErrorNotice message={errorMessage} />}
+
+            {rejected && message && (
+              <Text
+                accessibilityRole="alert"
+                style={{
+                  ...theme.text.small,
+                  color: theme.colors.textStrong,
+                  textAlign: 'center',
+                }}>
+                {message}
+              </Text>
+            )}
+
+            {chart === null && <Button label="Choose a chart" onPress={pick} />}
+
+            {chart !== null && rejected && <Button label="Pick a different chart" onPress={pick} />}
+
+            {/* Try again re-runs on the Chart already picked, so a flaky network
+                costs one tap and no re-picking. */}
+            {chart !== null && !rejected && (
+              <>
+                <Button label={failed ? 'Try again' : 'Analyze this chart'} onPress={analyze} />
+                <Button label="Pick a different chart" variant="secondary" onPress={pick} />
+              </>
+            )}
           </>
         )}
       </View>
