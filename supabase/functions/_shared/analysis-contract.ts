@@ -45,6 +45,8 @@ export const analysisResultSchema = z.discriminatedUnion('is_chart', [
   rejectionSchema,
 ]);
 
+export type Trend = (typeof TRENDS)[number];
+export type Direction = (typeof DIRECTIONS)[number];
 export type Pattern = z.infer<typeof patternSchema>;
 export type Strategy = z.infer<typeof strategySchema>;
 export type Analysis = z.infer<typeof analysisSchema>;

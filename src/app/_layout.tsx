@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 
 import { useInterFonts } from '@/hooks/use-inter-fonts';
+import { AnalyzeFlowProvider } from '@/lib/analyze-flow';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { startServerConnectionCheck } from '@/lib/use-server-connection';
 import { themeForScheme } from '@/theme';
@@ -17,6 +18,7 @@ function RootStack() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={session !== null}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="analysis" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
       </Stack.Protected>
       <Stack.Screen name="sign-in" />
@@ -56,7 +58,9 @@ export default function RootLayout() {
     <ThemeProvider value={navigationTheme}>
       <StatusBar style="auto" />
       <AuthProvider>
-        <RootStack />
+        <AnalyzeFlowProvider>
+          <RootStack />
+        </AnalyzeFlowProvider>
       </AuthProvider>
     </ThemeProvider>
   );

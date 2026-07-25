@@ -74,6 +74,13 @@
             ]
           }
         }
+      ],
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Inflectra needs your photos so you can pick a chart screenshot to analyze."
+        }
       ]
     ],
     "experiments": {

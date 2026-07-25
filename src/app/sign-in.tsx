@@ -1,15 +1,9 @@
 import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
 import { OpacityPressable } from '@/components/opacity-pressable';
 import { useAuth } from '@/lib/auth';
 import { isValidEmail } from '@/lib/magic-link';
@@ -156,33 +150,13 @@ export default function SignInScreen() {
               editable={!sending}
               onSubmitEditing={() => canSend && sendLink(email.trim())}
             />
-            <OpacityPressable
-              accessibilityRole="button"
+            <Button
+              label={sending ? 'Sending…' : 'Send sign-in link'}
               accessibilityLabel="Send sign-in link"
-              accessibilityState={{ disabled: !canSend }}
+              loading={sending}
               disabled={!canSend}
               onPress={() => sendLink(email.trim())}
-              style={{
-                backgroundColor: canSend ? theme.colors.interactiveAction : theme.colors.fillDisabled,
-                borderRadius: theme.radius.r12,
-                paddingVertical: theme.spacing.space12,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'row',
-                gap: theme.spacing.space8,
-              }}>
-              {sending && (
-                <ActivityIndicator size="small" color={theme.colors.textInverseStrong} />
-              )}
-              <Text
-                style={{
-                  ...theme.text.body,
-                  fontWeight: theme.fontWeight.strong,
-                  color: canSend ? theme.colors.textInverseStrong : theme.colors.textWeak,
-                }}>
-                {sending ? 'Sending…' : 'Send sign-in link'}
-              </Text>
-            </OpacityPressable>
+            />
             {supabase === null && (
               <Text
                 style={{ ...theme.text.small, color: theme.colors.textWeak, textAlign: 'center' }}>
