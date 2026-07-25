@@ -34,8 +34,10 @@ export function HistoryRow({ entry }: { entry: HistoryEntry }) {
         paddingHorizontal: theme.spacing.space20,
         paddingVertical: theme.spacing.space12,
       }}>
+      {/* Cached by storage path: the signed URL is re-minted on every visit,
+          and would otherwise re-download the Chart each time. */}
       <Image
-        source={entry.thumbnailUrl ? { uri: entry.thumbnailUrl } : null}
+        source={entry.thumbnailUrl ? { uri: entry.thumbnailUrl, cacheKey: entry.storagePath } : null}
         contentFit="cover"
         transition={theme.duration.fast}
         style={{

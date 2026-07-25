@@ -27,7 +27,7 @@ export default function HistoryScreen() {
   const theme = useTheme();
   const { entries, error, refreshing, refresh, retry } = useHistory();
 
-  const body = () => {
+  const renderBody = () => {
     if (entries === null && error === null) {
       return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -93,7 +93,7 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.backgroundBase }}>
       <ScreenHeader title="History" />
-      {body()}
+      {renderBody()}
     </SafeAreaView>
   );
 }

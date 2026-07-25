@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { analysisResultSchema, type AnalysisResult } from '@/lib/analysis-contract';
 import { supabase } from '@/lib/supabase';
+import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
 
 /* Longest edge the app uploads: enough detail for the AI to read price levels,
    small enough to keep uploads and analysis fast. */
@@ -15,18 +16,6 @@ const JPEG_QUALITY = 0.8;
 
 export const GENERIC_ANALYZE_ERROR =
   "The analysis didn't go through. Check your connection and try again.";
-
-/* An expected failure whose message is safe to show the user as-is. */
-export class AnalyzeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AnalyzeError';
-  }
-}
-
-export function analyzeErrorMessage(error: unknown): string {
-  return error instanceof AnalyzeError ? error.message : GENERIC_ANALYZE_ERROR;
-}
 
 export type PickedChart = { uri: string; width: number; height: number };
 
@@ -80,9 +69,7 @@ function chartObjectName(): string {
    which saves the History row itself on success. */
 export async function analyzeChart(chart: PickedChart, userId: string): Promise<AnalysisResult> {
   const client = supabase;
-  if (!client) {
-    throw new AnalyzeError("The server connection isn't set up yet. Restart the app and retry.");
-  }
+  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
 
   const preparedUri = await prepareChart(chart);
   const storagePath = `${userId}/${chartObjectName()}`;
@@ -92,7 +79,7 @@ export async function analyzeChart(chart: PickedChart, userId: string): Promise<
     .from(BUCKET)
     .upload(storagePath, bytes, { contentType: CONTENT_TYPE });
   if (uploadError) {
-    throw new AnalyzeError("We couldn't upload your chart. Check your connection and try again.");
+    throw new UserFacingError("We couldn't upload your chart. Check your connection and try again.");
   }
 
   /* Only a saved Analysis earns its Chart a place in storage: a Rejection or a
@@ -105,13 +92,13 @@ export async function analyzeChart(chart: PickedChart, userId: string): Promise<
   if (error) {
     const message = await serverErrorMessage(error);
     await discardChart();
-    throw new AnalyzeError(message);
+    throw new UserFacingError(message);
   }
 
   const parsed = analysisResultSchema.safeParse(data);
   if (!parsed.success) {
     await discardChart();
-    throw new AnalyzeError("The AI's answer came back garbled. Try again.");
+    throw new UserFacingError("The AI's answer came back garbled. Try again.");
   }
   if (!parsed.data.is_chart) await discardChart();
   return parsed.data;

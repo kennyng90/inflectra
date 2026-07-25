@@ -1,7 +1,8 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
-import { fetchHistory, historyErrorMessage, type HistoryEntry } from '@/lib/history';
+import { HISTORY_LOAD_ERROR, fetchHistory, type HistoryEntry } from '@/lib/history';
+import { userFacingMessage } from '@/lib/user-facing-error';
 
 export type History = {
   /* Null until the first load lands. */
@@ -22,13 +23,13 @@ export function useHistory(): History {
     const id = ++request.current;
     try {
       const next = await fetchHistory();
+      /* A newer load owns the state now. */
       if (id !== request.current) return;
       setEntries(next);
       setError(null);
     } catch (caught) {
-      /* A newer load owns the state now. */
       if (id !== request.current) return;
-      setError(historyErrorMessage(caught));
+      setError(userFacingMessage(caught, HISTORY_LOAD_ERROR));
     }
   }, []);
 

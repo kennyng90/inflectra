@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { DIRECTIONS, TRENDS, type Direction, type Trend } from '@/lib/analysis-contract';
 import { supabase } from '@/lib/supabase';
+import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
 
 const BUCKET = 'charts';
 const TABLE = 'analyses';
@@ -15,18 +16,6 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 export const HISTORY_LOAD_ERROR =
   "We couldn't load your history. Check your connection and try again.";
 
-/* An expected failure whose message is safe to show the user as-is. */
-export class HistoryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'HistoryError';
-  }
-}
-
-export function historyErrorMessage(error: unknown): string {
-  return error instanceof HistoryError ? error.message : HISTORY_LOAD_ERROR;
-}
-
 export type HistoryEntry = {
   id: string;
   assetGuess: string;
@@ -34,11 +23,10 @@ export type HistoryEntry = {
   createdAt: string;
   trend: Trend;
   direction: Direction;
-  /* Null while unsigned, and when signing failed. */
   thumbnailUrl: string | null;
 };
 
-export type HistoryRow = {
+export type HistoryRecord = {
   id: string;
   asset_guess: string;
   storage_path: string;
@@ -53,7 +41,7 @@ const listedAnalysisSchema = z.object({
   strategy: z.object({ direction: z.enum(DIRECTIONS) }),
 });
 
-export function toHistoryEntry(row: HistoryRow): HistoryEntry | null {
+export function toHistoryEntry(row: HistoryRecord): HistoryEntry | null {
   const parsed = listedAnalysisSchema.safeParse(row.analysis);
   if (!parsed.success) return null;
 
@@ -95,17 +83,15 @@ async function withThumbnails(
 export async function fetchHistory(
   client: SupabaseClient | null = supabase,
 ): Promise<HistoryEntry[]> {
-  if (!client) {
-    throw new HistoryError("The server connection isn't set up yet. Restart the app and retry.");
-  }
+  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
 
   const { data, error } = await client
     .from(TABLE)
     .select(LISTED_COLUMNS)
     .order('created_at', { ascending: false });
-  if (error || !data) throw new HistoryError(HISTORY_LOAD_ERROR);
+  if (error || !data) throw new UserFacingError(HISTORY_LOAD_ERROR);
 
-  const entries = (data as HistoryRow[])
+  const entries = (data as HistoryRecord[])
     .map(toHistoryEntry)
     .filter((entry): entry is HistoryEntry => entry !== null);
 

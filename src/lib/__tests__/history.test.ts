@@ -4,10 +4,10 @@ import {
   HISTORY_LOAD_ERROR,
   fetchHistory,
   formatHistoryDate,
-  historyErrorMessage,
   toHistoryEntry,
-  type HistoryRow,
+  type HistoryRecord,
 } from '../history';
+import { userFacingMessage } from '../user-facing-error';
 
 const analysis = {
   is_chart: true,
@@ -30,7 +30,7 @@ const analysis = {
   },
 };
 
-const row = (overrides: Partial<HistoryRow> = {}): HistoryRow => ({
+const row = (overrides: Partial<HistoryRecord> = {}): HistoryRecord => ({
   id: 'row-1',
   asset_guess: 'BTC/USD 4h',
   storage_path: 'user-1/chart-1.jpg',
@@ -165,13 +165,13 @@ describe('fetchHistory', () => {
   });
 });
 
-describe('historyErrorMessage', () => {
+describe('the message a failed load shows', () => {
   it('shows an expected failure as-is', async () => {
     const error = await fetchHistory(null).catch((caught) => caught);
-    expect(historyErrorMessage(error)).toMatch(/connection/i);
+    expect(userFacingMessage(error, HISTORY_LOAD_ERROR)).toMatch(/connection/i);
   });
 
   it('falls back for anything unexpected', () => {
-    expect(historyErrorMessage(new TypeError('boom'))).toBe(HISTORY_LOAD_ERROR);
+    expect(userFacingMessage(new TypeError('boom'), HISTORY_LOAD_ERROR)).toBe(HISTORY_LOAD_ERROR);
   });
 });

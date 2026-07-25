@@ -2,7 +2,12 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 
 import { isRejection, type Analysis } from '@/lib/analysis-contract';
 import { useAuth } from '@/lib/auth';
-import { analyzeChart, analyzeErrorMessage, type PickedChart } from '@/lib/chart-analysis';
+import {
+  GENERIC_ANALYZE_ERROR,
+  analyzeChart,
+  type PickedChart,
+} from '@/lib/chart-analysis';
+import { userFacingMessage } from '@/lib/user-facing-error';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
@@ -60,7 +65,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
         setPhase('idle');
         return true;
       } catch (error) {
-        return fail(analyzeErrorMessage(error));
+        return fail(userFacingMessage(error, GENERIC_ANALYZE_ERROR));
       }
     };
 
