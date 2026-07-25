@@ -20,11 +20,13 @@
     "react-native": "0.86.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
+    "deno": "^2.9.4",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.0",
     "jest": "~29.7.0",
@@ -38,6 +40,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
+    "test:functions": "cd supabase/functions && deno task test",
     "typecheck": "tsc --noEmit"
   },
   "private": true,
@@ -45,6 +48,10 @@
     "preset": "jest-expo",
     "setupFiles": [
       "./jest.setup.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/supabase/"
     ]
   }
 }

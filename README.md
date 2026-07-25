@@ -16,6 +16,29 @@ npm run lint          # expo lint
 
 Copy `.env.example` to `.env.local` and fill in the project URL and anon key from the Supabase dashboard (Project Settings -> API). The Metro dev server picks these up; without them the app boots and Settings shows the server as not set up.
 
+## analyze-chart Edge Function
+
+The only AI touchpoint. It takes the storage path of an uploaded Chart, calls Claude, and returns either a schema-valid Analysis (saved to History) or a Rejection (saved nowhere). The response contract lives in `supabase/functions/_shared/analysis-contract.ts` and is re-exported to the app as `src/lib/analysis-contract.ts`.
+
+```bash
+npm run test:functions   # deno contract tests, no Supabase or network needed
+supabase start           # local stack (db, auth, storage)
+supabase functions serve analyze-chart --env-file supabase/functions/.env.local
+```
+
+Copy `supabase/functions/.env.example` to `supabase/functions/.env.local` for local runs. In production the key is a function secret, never in the app binary:
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase functions deploy analyze-chart
+```
+
+After changing migrations, run `supabase db reset` locally and regenerate `supabase/functions/_shared/database.types.ts`:
+
+```bash
+supabase gen types typescript --local > supabase/functions/_shared/database.types.ts
+```
+
 ## Dev build on iPhone
 
 The app runs as an EAS development build (project `@kenng90/inflectra`):
