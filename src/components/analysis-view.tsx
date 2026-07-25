@@ -1,17 +1,26 @@
 import { Image } from 'expo-image';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Accordion } from '@/components/accordion';
 import type { Analysis, Trend } from '@/lib/analysis-contract';
 import {
   DISCLAIMER,
+  buildLadder,
   directionCopy,
   formatPercent,
   formatPrice,
   trendCopy,
+  type LadderRung,
 } from '@/lib/analysis-copy';
 import { useTheme, type Theme } from '@/theme';
 
-const CHART_ASPECT_RATIO = 16 / 9;
+/* Sizes with no token behind them: a chart strip wide enough to recognise but
+   short enough to keep the ladder in view, and the ladder's own dots. */
+const CHART_ASPECT_RATIO = 2;
+const DOT_SIZE = 10;
+const DELTA_COLUMN_WIDTH = 64;
+const DETAIL_LABEL_WIDTH = 104;
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
 const trendPillColors: Record<Trend, (theme: Theme) => { fill: string; text: string }> = {
   bullish: (theme) => ({ fill: theme.colors.fillSuccessWeak, text: theme.colors.textSuccess }),
@@ -19,33 +28,205 @@ const trendPillColors: Record<Trend, (theme: Theme) => { fill: string; text: str
   sideways: (theme) => ({ fill: theme.colors.fillWeak, text: theme.colors.textWeak }),
 };
 
-function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
+const rungColors: Record<LadderRung['kind'], (theme: Theme) => { dot: string; delta: string }> = {
+  target: (theme) => ({ dot: theme.colors.fillSuccessStrong, delta: theme.colors.textSuccess }),
+  entry: (theme) => ({ dot: theme.colors.fillBrandStrong, delta: theme.colors.textWeak }),
+  stop: (theme) => ({ dot: theme.colors.fillErrorStrong, delta: theme.colors.textError }),
+};
+
+function Note({ children }: { children: string }) {
+  const theme = useTheme();
+  return <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{children}</Text>;
+}
+
+function Pill({ fill, color, label }: { fill: string; color: string; label: string }) {
   const theme = useTheme();
 
   return (
-    <View style={{ gap: theme.spacing.space8 }}>
-      <Text
-        accessibilityRole="header"
-        style={{
-          ...theme.text.tiny,
-          fontWeight: theme.fontWeight.strong,
-          color: theme.colors.textWeak,
-          textTransform: 'uppercase',
-        }}>
-        {heading}
+    <View
+      style={{
+        backgroundColor: fill,
+        borderRadius: theme.radius.rFull,
+        paddingHorizontal: theme.spacing.space12,
+        paddingVertical: theme.spacing.space4,
+      }}>
+      <Text style={{ ...theme.text.tiny, fontWeight: theme.fontWeight.strong, color }}>
+        {label}
       </Text>
-      {children}
     </View>
   );
 }
 
-function Body({ children }: { children: string }) {
+function BodyText({ children }: { children: string }) {
   const theme = useTheme();
   return <Text style={{ ...theme.text.body, color: theme.colors.textStrong }}>{children}</Text>;
 }
 
-/* Label left, short value pinned right. Labels wrap, values never do. */
-function ValueRow({ label, hint, value }: { label: string; hint?: string; value: string }) {
+function ChartStrip({ uri, assetGuess }: { uri: string; assetGuess: string }) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={{
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.strokeWeak,
+      }}>
+      <Image
+        accessibilityLabel="The chart you analyzed"
+        source={{ uri }}
+        contentFit="contain"
+        style={{
+          width: '100%',
+          aspectRatio: CHART_ASPECT_RATIO,
+          backgroundColor: theme.colors.backgroundAlternate,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          top: theme.spacing.space12,
+          left: theme.spacing.space12,
+        }}>
+        <Pill
+          fill={theme.colors.fillStrong}
+          color={theme.colors.backgroundBase}
+          label={assetGuess}
+        />
+      </View>
+    </View>
+  );
+}
+
+function TrendPill({ trend }: { trend: Trend }) {
+  const theme = useTheme();
+  const colors = trendPillColors[trend](theme);
+
+  return (
+    <Pill
+      fill={colors.fill}
+      color={colors.text}
+      label={`${trendCopy[trend].arrow} ${trendCopy[trend].label}`}
+    />
+  );
+}
+
+function Rung({ rung, first }: { rung: LadderRung; first: boolean }) {
+  const theme = useTheme();
+  const colors = rungColors[rung.kind](theme);
+  const isEntry = rung.kind === 'entry';
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.space12,
+        paddingVertical: theme.spacing.space12,
+        borderTopWidth: first ? 0 : StyleSheet.hairlineWidth,
+        borderTopColor: theme.colors.strokeWeak,
+      }}>
+      {/* The entry dot wears a halo; the padding keeps every label in one column. */}
+      <View
+        style={{
+          padding: theme.spacing.space4,
+          borderRadius: theme.radius.rFull,
+          backgroundColor: isEntry ? theme.colors.strokeBrandWeak : undefined,
+        }}>
+        <View
+          style={{
+            width: DOT_SIZE,
+            height: DOT_SIZE,
+            borderRadius: theme.radius.rFull,
+            backgroundColor: colors.dot,
+          }}
+        />
+      </View>
+      <View style={{ flex: 1, gap: theme.spacing.space2 }}>
+        <Text
+          style={{
+            ...theme.text.tiny,
+            fontWeight: theme.fontWeight.medium,
+            color: theme.colors.textStrong,
+          }}>
+          {rung.label}
+        </Text>
+        <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{rung.hint}</Text>
+      </View>
+      <Text
+        style={{
+          ...theme.text.heading4,
+          ...TABULAR,
+          fontWeight: theme.fontWeight.strong,
+          color: theme.colors.textStrong,
+        }}>
+        {formatPrice(rung.price)}
+      </Text>
+      <Text
+        style={{
+          ...theme.text.tiny,
+          ...TABULAR,
+          color: colors.delta,
+          minWidth: DELTA_COLUMN_WIDTH,
+          textAlign: 'right',
+        }}>
+        {rung.delta ?? ''}
+      </Text>
+    </View>
+  );
+}
+
+function ConfidenceBar({ confidence }: { confidence: number }) {
+  const theme = useTheme();
+  const percent = `${Math.round(confidence * 100)}%` as const;
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space12 }}>
+      <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>How sure is the AI?</Text>
+      <View
+        style={{
+          flex: 1,
+          height: theme.spacing.space4,
+          borderRadius: theme.radius.rFull,
+          backgroundColor: theme.colors.fillWeak,
+          overflow: 'hidden',
+        }}>
+        <View
+          style={{
+            width: percent,
+            height: '100%',
+            borderRadius: theme.radius.rFull,
+            backgroundColor: theme.colors.fillBrandStrong,
+          }}
+        />
+      </View>
+      <Text
+        style={{
+          ...theme.text.tiny,
+          ...TABULAR,
+          fontWeight: theme.fontWeight.strong,
+          color: theme.colors.textStrong,
+        }}>
+        {percent}
+      </Text>
+    </View>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', gap: theme.spacing.space8 }}>
+      <Text
+        style={{ ...theme.text.tiny, color: theme.colors.textWeak, width: DETAIL_LABEL_WIDTH }}>
+        {label}
+      </Text>
+      <Text style={{ ...theme.text.tiny, color: theme.colors.textStrong, flex: 1 }}>{value}</Text>
+    </View>
+  );
+}
+
+function PatternRow({ name, confidence }: { name: string; confidence: number }) {
   const theme = useTheme();
 
   return (
@@ -54,175 +235,130 @@ function ValueRow({ label, hint, value }: { label: string; hint?: string; value:
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
-        gap: theme.spacing.space16,
+        gap: theme.spacing.space12,
       }}>
-      <View style={{ flexShrink: 1, gap: theme.spacing.space2 }}>
-        <Text style={{ ...theme.text.body, color: theme.colors.textStrong }}>{label}</Text>
-        {hint && <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{hint}</Text>}
-      </View>
+      <Text style={{ ...theme.text.tiny, color: theme.colors.textStrong, flex: 1 }}>{name}</Text>
       <Text
         style={{
-          ...theme.text.body,
+          ...theme.text.tiny,
+          ...TABULAR,
           fontWeight: theme.fontWeight.strong,
-          color: theme.colors.textStrong,
+          color: theme.colors.textWeak,
         }}>
-        {value}
+        {`${formatPercent(confidence)} sure`}
       </Text>
     </View>
   );
 }
 
-/* Prose values need the width, so these read as two columns instead. */
-function DetailRow({ label, value }: { label: string; value: string }) {
-  const theme = useTheme();
-
-  return (
-    <View style={{ flexDirection: 'row', gap: theme.spacing.space16 }}>
-      <Text style={{ ...theme.text.body, color: theme.colors.textWeak, flex: 1 }}>{label}</Text>
-      <Text style={{ ...theme.text.body, color: theme.colors.textStrong, flex: 2 }}>{value}</Text>
-    </View>
-  );
+function priceList(levels: number[]): string {
+  return levels.length === 0 ? 'None found' : levels.map(formatPrice).join(', ');
 }
 
 export function AnalysisView({ analysis, chartUri }: { analysis: Analysis; chartUri: string }) {
   const theme = useTheme();
   const strategy = analysis.strategy;
   const copy = directionCopy[strategy.direction];
-  const trend = trendPillColors[analysis.trend](theme);
+  const ladder = buildLadder(strategy);
+  const showLadderNote = ladder.some((rung) => rung.delta !== null);
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        padding: theme.spacing.space20,
-        paddingBottom: theme.spacing.space48,
-        gap: theme.spacing.space24,
-      }}>
-      <Image
-        accessibilityLabel="The chart you analyzed"
-        source={{ uri: chartUri }}
-        contentFit="contain"
-        style={{
-          width: '100%',
-          aspectRatio: CHART_ASPECT_RATIO,
-          borderRadius: theme.radius.r12,
-          backgroundColor: theme.colors.backgroundAlternate,
-        }}
-      />
+    <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.space32 }}>
+      <ChartStrip uri={chartUri} assetGuess={analysis.asset_guess} />
 
-      <View style={{ gap: theme.spacing.space8 }}>
+      <View style={{ padding: theme.spacing.space20, gap: theme.spacing.space16 }}>
         <View
           style={{
             flexDirection: 'row',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: theme.spacing.space12,
           }}>
-          <Text
-            style={{
-              ...theme.text.heading4,
-              fontWeight: theme.fontWeight.strong,
-              color: theme.colors.textStrong,
-              flexShrink: 1,
-            }}>
-            {analysis.asset_guess}
-          </Text>
-          <View
-            style={{
-              backgroundColor: trend.fill,
-              borderRadius: theme.radius.rFull,
-              paddingHorizontal: theme.spacing.space12,
-              paddingVertical: theme.spacing.space4,
-            }}>
+          <View style={{ flexShrink: 1, gap: theme.spacing.space2 }}>
             <Text
+              accessibilityRole="header"
               style={{
-                ...theme.text.tiny,
-                fontWeight: theme.fontWeight.strong,
-                color: trend.text,
+                ...theme.text.heading3,
+                fontWeight: theme.fontWeight.bold,
+                color: theme.colors.textStrong,
               }}>
-              {`${trendCopy[analysis.trend].arrow} ${trendCopy[analysis.trend].label}`}
+              {copy.headline}
             </Text>
+            <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{copy.sub}</Text>
           </View>
+          <TrendPill trend={analysis.trend} />
         </View>
-        <Text
-          accessibilityRole="header"
+
+        <View>
+          {ladder.map((rung, index) => (
+            <Rung key={`${rung.kind}-${rung.label}`} rung={rung} first={index === 0} />
+          ))}
+        </View>
+
+        {showLadderNote && <Note>{copy.ladderNote}</Note>}
+
+        <ConfidenceBar confidence={strategy.confidence} />
+
+        <View
           style={{
-            ...theme.text.heading2,
-            fontWeight: theme.fontWeight.bold,
-            color: theme.colors.textStrong,
+            backgroundColor: theme.colors.backgroundAlternate,
+            borderRadius: theme.radius.r12,
+            paddingHorizontal: theme.spacing.space16,
+            paddingVertical: theme.spacing.space12,
           }}>
-          {copy.headline}
-        </Text>
-        <Text style={{ ...theme.text.body, color: theme.colors.textWeak }}>{copy.sub}</Text>
+          <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>
+            {strategy.rationale}
+          </Text>
+        </View>
       </View>
 
-      <Section heading="Prices to act on">
-        <View style={{ gap: theme.spacing.space12 }}>
-          <ValueRow label={copy.entry} hint={copy.entryHint} value={formatPrice(strategy.entry)} />
-          {strategy.take_profit.map((price, index) => (
-            <ValueRow
-              key={`${price}-${index}`}
-              label={`${copy.target} ${index + 1}`}
-              hint={copy.targetHint}
-              value={formatPrice(price)}
-            />
-          ))}
-          <ValueRow label={copy.stop} hint={copy.stopHint} value={formatPrice(strategy.stop_loss)} />
-        </View>
-      </Section>
+      <Accordion title={`Why the AI says ${copy.verb}`} defaultOpen>
+        <BodyText>{analysis.summary}</BodyText>
+      </Accordion>
 
-      <Section heading="How sure is the AI?">
-        <Body>{`${formatPercent(strategy.confidence)} sure about this plan.`}</Body>
-      </Section>
-
-      <Section heading={`Why the AI says ${copy.headline.toLowerCase()}`}>
-        <Body>{strategy.rationale}</Body>
-      </Section>
-
-      <Section heading="What the AI sees">
-        <Body>{analysis.summary}</Body>
-      </Section>
-
-      <Section heading="Shapes in the chart">
+      <Accordion title={`Shapes in the chart (${analysis.patterns.length})`}>
         {analysis.patterns.length === 0 ? (
-          <Body>The AI didn&apos;t find any known shapes in this chart.</Body>
+          <Note>The AI didn&apos;t find any known shapes in this chart.</Note>
         ) : (
-          <View style={{ gap: theme.spacing.space8 }}>
-            {analysis.patterns.map((pattern, index) => (
-              <ValueRow
-                key={`${pattern.name}-${index}`}
-                label={pattern.name}
-                value={`${formatPercent(pattern.confidence)} sure`}
-              />
-            ))}
-          </View>
+          <>
+            <Note>
+              The AI found shapes that hint where the price may go next. The percentage shows how
+              sure it is about each one.
+            </Note>
+            <View style={{ gap: theme.spacing.space8 }}>
+              {analysis.patterns.map((pattern, index) => (
+                <PatternRow
+                  key={`${pattern.name}-${index}`}
+                  name={pattern.name}
+                  confidence={pattern.confidence}
+                />
+              ))}
+            </View>
+          </>
         )}
-      </Section>
+      </Accordion>
 
-      <Section heading="Key prices and market mood">
+      <Accordion title="Key prices & market mood">
+        <Note>The price tends to bounce up from the floor and stop at the ceiling.</Note>
         <View style={{ gap: theme.spacing.space8 }}>
-          <DetailRow
-            label="Price floor"
-            value={
-              analysis.support_levels.length === 0
-                ? 'None found'
-                : analysis.support_levels.map(formatPrice).join(', ')
-            }
-          />
-          <DetailRow
-            label="Price ceiling"
-            value={
-              analysis.resistance_levels.length === 0
-                ? 'None found'
-                : analysis.resistance_levels.map(formatPrice).join(', ')
-            }
-          />
+          <DetailRow label="Price floor" value={priceList(analysis.support_levels)} />
+          <DetailRow label="Price ceiling" value={priceList(analysis.resistance_levels)} />
           <DetailRow label="Price swings" value={analysis.volatility} />
           <DetailRow label="Trading activity" value={analysis.volume_read} />
           <DetailRow label="Market mood" value={analysis.sentiment} />
         </View>
-      </Section>
+      </Accordion>
 
-      <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{DISCLAIMER}</Text>
+      <Text
+        style={{
+          ...theme.text.tiny,
+          color: theme.colors.textWeak,
+          textAlign: 'center',
+          paddingHorizontal: theme.spacing.space20,
+          paddingTop: theme.spacing.space20,
+        }}>
+        {DISCLAIMER}
+      </Text>
     </ScrollView>
   );
 }
