@@ -1,11 +1,13 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
+import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
+import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
@@ -17,16 +19,16 @@ type CaptureNote = Extract<CaptureOutcome, { message: string }>;
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { phase, chart, message, pickChart, submit } = useAnalyzeFlow();
+  const { phase, chart, rejection, error, pickChart, submit } = useAnalyzeFlow();
   const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
 
   const analyzing = phase === 'analyzing';
+  const rejected = phase === 'rejected';
   const cameraOff = captureNote?.status === 'blocked';
   /* A rejected Chart can't be analyzed again, and a camera that's off can't
      take one, so whichever action can still move the user on leads. */
-  const lead = chart !== null && phase !== 'rejected' ? 'analyze' : cameraOff ? 'library' : 'camera';
-  const note = captureNote?.message ?? message;
-  const noteIsError = captureNote !== null || phase === 'failed';
+  const lead = chart !== null && !rejected ? 'analyze' : cameraOff ? 'library' : 'camera';
+  const note = captureNote?.message ?? error;
 
   const capture = async (source: () => Promise<CaptureOutcome>) => {
     setCaptureNote(null);
@@ -71,40 +73,38 @@ export default function AnalyzeScreen() {
               flex: 1,
               borderRadius: theme.radius.r12,
               backgroundColor: theme.colors.backgroundAlternate,
-              opacity: analyzing ? 0.3 : 1,
+              opacity: analyzing || rejected ? 0.3 : 1,
             }}
           />
           {analyzing && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.space12,
-                  padding: theme.spacing.space20,
-                },
-              ]}>
-              <ActivityIndicator size="large" color={theme.colors.interactiveAction} />
-              <Text
-                accessibilityRole="alert"
-                style={{
-                  ...theme.text.body,
-                  fontWeight: theme.fontWeight.strong,
-                  color: theme.colors.textStrong,
-                  textAlign: 'center',
-                }}>
-                Reading your chart…
-              </Text>
-              <Text
-                style={{
-                  ...theme.text.small,
-                  color: theme.colors.textWeak,
-                  textAlign: 'center',
-                }}>
-                This usually takes under a minute.
-              </Text>
-            </View>
+            <ChartOverlay>
+              <View style={{ alignItems: 'center', gap: theme.spacing.space12 }}>
+                <ActivityIndicator size="large" color={theme.colors.interactiveAction} />
+                <Text
+                  accessibilityRole="alert"
+                  style={{
+                    ...theme.text.body,
+                    fontWeight: theme.fontWeight.strong,
+                    color: theme.colors.textStrong,
+                    textAlign: 'center',
+                  }}>
+                  Reading your chart…
+                </Text>
+                <Text
+                  style={{
+                    ...theme.text.small,
+                    color: theme.colors.textWeak,
+                    textAlign: 'center',
+                  }}>
+                  This usually takes under a minute.
+                </Text>
+              </View>
+            </ChartOverlay>
+          )}
+          {rejected && (
+            <ChartOverlay>
+              <RejectionNotice reason={rejection} />
+            </ChartOverlay>
           )}
         </View>
       )}
@@ -120,15 +120,15 @@ export default function AnalyzeScreen() {
             accessibilityRole="alert"
             style={{
               ...theme.text.small,
-              color: noteIsError ? theme.colors.textError : theme.colors.textStrong,
+              color: theme.colors.textError,
               textAlign: 'center',
             }}>
             {note}
           </Text>
         )}
 
-        {/* Stays mounted while analyzing: the overlay carries the progress,
-            so no second spinner here. */}
+        {/* Kept mounted while analyzing so the preview doesn't jump; the
+            overlay carries the progress, so no second spinner here. */}
         {lead === 'analyze' && (
           <Button
             label={phase === 'failed' ? 'Try again' : 'Analyze this chart'}

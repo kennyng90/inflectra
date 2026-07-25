@@ -11,8 +11,10 @@ export type CompletedAnalysis = { analysis: Analysis; chartUri: string };
 type AnalyzeFlow = {
   phase: AnalyzePhase;
   chart: PickedChart | null;
-  /* Rejection reason when rejected, error message when failed. */
-  message: string | null;
+  /* The AI's reason for turning the Chart down. */
+  rejection: string | null;
+  /* Why the analysis never finished. */
+  error: string | null;
   completed: CompletedAnalysis | null;
   pickChart: (chart: PickedChart) => void;
   /* Resolves true once a new Analysis is ready to open. */
@@ -26,19 +28,25 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
   const userId = session?.user.id ?? null;
   const [phase, setPhase] = useState<AnalyzePhase>('idle');
   const [chart, setChart] = useState<PickedChart | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<CompletedAnalysis | null>(null);
 
   const value = useMemo<AnalyzeFlow>(() => {
+    const clearVerdict = () => {
+      setRejection(null);
+      setError(null);
+    };
+
     const pickChart = (next: PickedChart) => {
       setChart(next);
-      setMessage(null);
+      clearVerdict();
       setPhase('ready');
     };
 
     const fail = (reason: string) => {
       setPhase('failed');
-      setMessage(reason);
+      setError(reason);
       return false;
     };
 
@@ -46,12 +54,12 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       if (!chart || phase === 'analyzing') return false;
       if (!userId) return fail('Sign in again to analyze this chart.');
       setPhase('analyzing');
-      setMessage(null);
+      clearVerdict();
       try {
         const result = await analyzeChart(chart, userId);
         if (isRejection(result)) {
           setPhase('rejected');
-          setMessage(result.reason);
+          setRejection(result.reason);
           return false;
         }
         setCompleted({ analysis: result, chartUri: chart.uri });
@@ -64,8 +72,8 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    return { phase, chart, message, completed, pickChart, submit };
-  }, [phase, chart, message, completed, userId]);
+    return { phase, chart, rejection, error, completed, pickChart, submit };
+  }, [phase, chart, rejection, error, completed, userId]);
 
   return <AnalyzeFlowContext.Provider value={value}>{children}</AnalyzeFlowContext.Provider>;
 }
