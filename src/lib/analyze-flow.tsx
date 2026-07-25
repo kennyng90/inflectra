@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { isRejection, type Analysis } from '@/lib/analysis-contract';
+import { type AnalyzeProgress } from '@/lib/analyzing-copy';
 import { useAuth } from '@/lib/auth';
 import {
   analyzeChart,
@@ -8,7 +9,6 @@ import {
   isCanceled,
   type PickedChart,
 } from '@/lib/chart-analysis';
-import { type AnalyzeStep } from '@/lib/analyzing-copy';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
@@ -22,10 +22,7 @@ type AnalyzeFlow = {
   /* Why the analysis never finished. */
   error: string | null;
   completed: CompletedAnalysis | null;
-  /* Where the in-flight run has got to, and when that step began, so the wait
-     can show staged progress. */
-  step: AnalyzeStep;
-  stepStartedAt: number;
+  progress: AnalyzeProgress;
   pickChart: (chart: PickedChart) => void;
   /* Resolves true once a new Analysis is ready to open. */
   submit: () => Promise<boolean>;
@@ -43,8 +40,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
   const [rejection, setRejection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<CompletedAnalysis | null>(null);
-  const [step, setStep] = useState<AnalyzeStep>('preparing');
-  const [stepStartedAt, setStepStartedAt] = useState(0);
+  const [progress, setProgress] = useState<AnalyzeProgress>({ step: 'preparing', startedAt: 0 });
   const runRef = useRef<AbortController | null>(null);
 
   const value = useMemo<AnalyzeFlow>(() => {
@@ -72,15 +68,11 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       runRef.current = run;
       setPhase('analyzing');
       clearVerdict();
-      setStep('preparing');
-      setStepStartedAt(Date.now());
+      setProgress({ step: 'preparing', startedAt: Date.now() });
       try {
         const result = await analyzeChart(chart, userId, {
           signal: run.signal,
-          onStep: (next) => {
-            setStep(next);
-            setStepStartedAt(Date.now());
-          },
+          onStep: (step) => setProgress({ step, startedAt: Date.now() }),
         });
         if (isRejection(result)) {
           setPhase('rejected');
@@ -93,7 +85,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
         setPhase('idle');
         return true;
       } catch (error) {
-        /* Cancelling was deliberate, so the Chart just comes back unexplained. */
+        /* Canceling was deliberate, so the Chart just comes back unexplained. */
         if (isCanceled(error)) {
           setPhase('ready');
           return false;
@@ -112,13 +104,12 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       rejection,
       error,
       completed,
-      step,
-      stepStartedAt,
+      progress,
       pickChart,
       submit,
       cancel,
     };
-  }, [phase, chart, rejection, error, completed, step, stepStartedAt, userId]);
+  }, [phase, chart, rejection, error, completed, progress, userId]);
 
   return <AnalyzeFlowContext.Provider value={value}>{children}</AnalyzeFlowContext.Provider>;
 }

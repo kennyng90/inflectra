@@ -4,9 +4,8 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-/* Git worktrees live in .claude/worktrees/ inside the repo, so a dev server
-   would otherwise bundle every other worktree's src/app alongside this one.
-   Everything under .claude/worktrees/ except the directory we booted from. */
+/* Worktrees live in .claude/worktrees/ inside the repo, so a dev server started
+   in one would otherwise bundle every other worktree's src/app alongside it. */
 const here = path.basename(__dirname).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const otherWorktrees = new RegExp(`[\\\\/]\\.claude[\\\\/]worktrees[\\\\/](?!${here}[\\\\/])`);
 

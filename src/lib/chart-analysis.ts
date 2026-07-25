@@ -33,7 +33,7 @@ export function analyzeErrorMessage(error: unknown): string {
 /* The user walked away from the run; nothing to report and nothing to fix. */
 export class CanceledError extends Error {
   constructor() {
-    super('The analysis was cancelled.');
+    super('The analysis was canceled.');
     this.name = 'CanceledError';
   }
 }
@@ -90,11 +90,14 @@ function chartObjectName(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
 }
 
-/* A cancelled run leaves no trace: the Chart goes, and so does the History row
-   the Edge Function saved before the app stopped listening. */
+/* A canceled run leaves no trace: the Chart goes, and so does the History row
+   the Edge Function saved after the app stopped listening. */
 async function discardRun(client: SupabaseClient, storagePath: string): Promise<void> {
-  await client.storage.from(BUCKET).remove([storagePath]);
-  await client.from('analyses').delete().eq('storage_path', storagePath);
+  /* Independently, so one failing half still leaves the other cleaned up. */
+  await Promise.allSettled([
+    client.storage.from(BUCKET).remove([storagePath]),
+    client.from('analyses').delete().eq('storage_path', storagePath),
+  ]);
 }
 
 export type AnalyzeOptions = {
@@ -103,13 +106,25 @@ export type AnalyzeOptions = {
   onStep?: (step: AnalyzeStep) => void;
 };
 
-/* Resolves once the signal aborts, and never otherwise. */
 const CANCELED = Symbol('canceled');
 
+/* Resolves once the signal aborts, and never otherwise. One that aborted during
+   an earlier step fires no event, so answer it straight away. */
 function canceledPromise(signal: AbortSignal): Promise<typeof CANCELED> {
+  if (signal.aborted) return Promise.resolve(CANCELED);
   return new Promise((resolve) => {
     signal.addEventListener('abort', () => resolve(CANCELED), { once: true });
   });
+}
+
+/* Neither the upload nor the Edge Function can be called off, so cancelling
+   stops waiting on them rather than stopping them: the caller gets control back
+   at once and undoes whatever they leave behind. */
+function untilCanceled<T>(
+  work: Promise<T>,
+  signal: AbortSignal | undefined,
+): Promise<T | typeof CANCELED> {
+  return signal ? Promise.race([work, canceledPromise(signal)]) : work;
 }
 
 /* Uploads to the user's private folder, then hands the path to analyze-chart -
@@ -130,34 +145,42 @@ export async function analyzeChart(
   const bytes = await readChartBytes(preparedUri);
   if (signal?.aborted) throw new CanceledError();
 
-  onStep?.('uploading');
-  const { error: uploadError } = await client.storage
-    .from(BUCKET)
-    .upload(storagePath, bytes, { contentType: CONTENT_TYPE });
-  if (uploadError) {
-    throw new AnalyzeError("We couldn't upload your chart. Check your connection and try again.");
-  }
-
   /* Only a saved Analysis earns its Chart a place in storage: a Rejection or a
      failure leaves the upload behind, so drop it. */
   const discardChart = () => client.storage.from(BUCKET).remove([storagePath]);
+
+  onStep?.('uploading');
+  const upload = client.storage
+    .from(BUCKET)
+    .upload(storagePath, bytes, { contentType: CONTENT_TYPE });
+
+  if ((await untilCanceled(upload, signal)) === CANCELED) {
+    /* The AI was never asked, so the Chart is all there is to undo. */
+    void upload.then(discardChart).catch(() => undefined);
+    throw new CanceledError();
+  }
+
+  const { error: uploadError } = await upload;
+  if (uploadError) {
+    throw new AnalyzeError("We couldn't upload your chart. Check your connection and try again.");
+  }
 
   onStep?.('reading');
   const pending = client.functions.invoke('analyze-chart', {
     body: { storage_path: storagePath },
   });
 
-  if (signal) {
-    const outcome = await Promise.race([pending, canceledPromise(signal)]);
-    if (outcome === CANCELED) {
-      /* The Edge Function runs to the end whatever the app does, and saves the
-         Analysis on the way, so let it finish and then undo it. */
-      void pending
-        .then(() => discardRun(client, storagePath))
-        .catch(() => discardChart())
-        .catch(() => undefined);
-      throw new CanceledError();
-    }
+  if ((await untilCanceled(pending, signal)) === CANCELED) {
+    /* The Edge Function runs to the end whatever the app does, and saves the
+       Analysis on the way, so let it finish and then undo it. */
+    void pending
+      .then(
+        () => discardRun(client, storagePath),
+        /* It failed anyway, so there is no Analysis to undo. */
+        () => discardChart(),
+      )
+      .catch(() => undefined);
+    throw new CanceledError();
   }
 
   const { data, error } = await pending;

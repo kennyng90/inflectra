@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 
@@ -13,7 +13,7 @@ export function ErrorNotice({ message }: { message: string }) {
       style={{
         backgroundColor: theme.colors.fillErrorWeak,
         borderColor: theme.colors.strokeErrorWeak,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderRadius: theme.radius.r12,
         padding: theme.spacing.space16,
         gap: theme.spacing.space4,

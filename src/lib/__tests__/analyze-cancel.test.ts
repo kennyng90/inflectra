@@ -1,6 +1,5 @@
-/* A cancel has to be provable end to end - the Edge Function saves the History
-   row itself, so the only honest test drives analyzeChart against a fake
-   Supabase client and checks what got undone. */
+/* The Edge Function saves the History row itself, so the only honest test of a
+   cancel drives analyzeChart against a fake client and checks what got undone. */
 import { analyzeChart, CanceledError, isCanceled } from '../chart-analysis';
 import type { AnalyzeStep } from '../analyzing-copy';
 
@@ -33,11 +32,14 @@ const removed: string[][] = [];
 const deleted: { table: string; column: string; value: string }[] = [];
 const uploaded: string[] = [];
 let resolveInvoke: ((value: { data: unknown; error: unknown }) => void) | null = null;
+/* Lets a test hold the upload open and cancel mid-flight. */
+let holdUpload: () => Promise<void> = () => Promise.resolve();
 
 const mockClient = {
   storage: {
     from: () => ({
       upload: async (path: string) => {
+        await holdUpload();
         uploaded.push(path);
         return { error: null };
       },
@@ -86,16 +88,15 @@ const analysis = {
   },
 };
 
-/* Lets every already-queued promise callback run. */
-const settle = async () => {
-  for (let i = 0; i < 8; i += 1) await Promise.resolve();
-};
+/* Drains the microtask queue, however many awaits deep the run currently is. */
+const settle = () => new Promise<void>((resolve) => setImmediate(() => resolve()));
 
 beforeEach(() => {
   removed.length = 0;
   deleted.length = 0;
   uploaded.length = 0;
   resolveInvoke = null;
+  holdUpload = () => Promise.resolve();
 });
 
 describe('analyzeChart cancellation', () => {
@@ -118,7 +119,7 @@ describe('analyzeChart cancellation', () => {
     await expect(run).rejects.toBeInstanceOf(CanceledError);
   });
 
-  it('undoes the saved Analysis when the cancelled run finishes anyway', async () => {
+  it('undoes the saved Analysis when the canceled run finishes anyway', async () => {
     const controller = new AbortController();
     const run = analyzeChart(chart, 'user-1', { signal: controller.signal });
     await settle();
@@ -133,6 +134,28 @@ describe('analyzeChart cancellation', () => {
     expect(removed).toEqual([[uploaded[0]]]);
   });
 
+  it('stops waiting on an upload it cannot call off, then drops what landed', async () => {
+    let finishUpload: (() => void) | null = null;
+    holdUpload = () => new Promise<void>((resolve) => { finishUpload = resolve; });
+
+    const controller = new AbortController();
+    const run = analyzeChart(chart, 'user-1', { signal: controller.signal });
+    await settle();
+
+    controller.abort();
+    await expect(run).rejects.toBeInstanceOf(CanceledError);
+    /* Control came back while the upload was still open. */
+    expect(uploaded).toEqual([]);
+
+    finishUpload!();
+    await settle();
+
+    /* The AI was never asked, so only the Chart needs undoing. */
+    expect(resolveInvoke).toBeNull();
+    expect(removed).toEqual([[uploaded[0]]]);
+    expect(deleted).toEqual([]);
+  });
+
   it('cancels before uploading when the user is quick', async () => {
     const controller = new AbortController();
     controller.abort();
@@ -145,7 +168,7 @@ describe('analyzeChart cancellation', () => {
 });
 
 describe('isCanceled', () => {
-  it('recognises a cancelled run', () => {
+  it('recognises a canceled run', () => {
     expect(isCanceled(new CanceledError())).toBe(true);
   });
 

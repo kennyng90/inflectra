@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
-import { analyzingStage, STAGE_COUNT, type AnalyzeStep } from '@/lib/analyzing-copy';
+import { OverlayCard } from '@/components/overlay-card';
+import { analyzingStage, STAGE_COUNT, type AnalyzeProgress } from '@/lib/analyzing-copy';
 import { useTheme } from '@/theme';
 
-/* Readable line length for centered body copy, matching EmptyState. */
-const BODY_MAX_WIDTH = 280;
-const CARD_MAX_WIDTH = 320;
 const BAR_WIDTH = 160;
 const BAR_HEIGHT = 4;
 const TICK = 1000;
 
 /* The staged wait: what the app is doing right now, and how far through the
    read that leaves us. */
-export function AnalyzingProgress({ step, startedAt }: { step: AnalyzeStep; startedAt: number }) {
+export function AnalyzingProgress({ progress }: { progress: AnalyzeProgress }) {
   const theme = useTheme();
   const [now, setNow] = useState(() => Date.now());
 
@@ -22,27 +20,15 @@ export function AnalyzingProgress({ step, startedAt }: { step: AnalyzeStep; star
     return () => clearInterval(tick);
   }, []);
 
-  const stage = analyzingStage(step, now - startedAt);
+  const stage = analyzingStage(progress.step, now - progress.startedAt);
 
   return (
-    <View
-      /* Same card as a Rejection: the Chart shows through behind it, so the
-         copy needs its own surface to stay readable over a dark screenshot. */
-      style={{
-        ...theme.elevation.md,
-        alignItems: 'center',
-        maxWidth: CARD_MAX_WIDTH,
-        gap: theme.spacing.space8,
-        padding: theme.spacing.space20,
-        borderRadius: theme.radius.r12,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: theme.colors.strokeWeak,
-        backgroundColor: theme.colors.backgroundRaised,
-      }}>
+    /* Polite, not an alert: the stages change mid-wait and should not
+       interrupt whatever the screen reader is saying. */
+    <OverlayCard accessibilityLiveRegion="polite" style={{ alignItems: 'center' }}>
       <ActivityIndicator size="small" color={theme.colors.interactiveAction} />
 
       <Text
-        accessibilityRole="alert"
         style={{
           ...theme.text.heading4,
           fontWeight: theme.fontWeight.strong,
@@ -57,7 +43,6 @@ export function AnalyzingProgress({ step, startedAt }: { step: AnalyzeStep; star
           ...theme.text.small,
           color: theme.colors.textWeak,
           textAlign: 'center',
-          maxWidth: BODY_MAX_WIDTH,
         }}>
         {stage.detail}
       </Text>
@@ -85,6 +70,6 @@ export function AnalyzingProgress({ step, startedAt }: { step: AnalyzeStep; star
           />
         ))}
       </View>
-    </View>
+    </OverlayCard>
   );
 }

@@ -1,9 +1,10 @@
-/* What the app says while an analysis runs. The wait is 15-60 seconds and the
-   AI reports no progress of its own, so the copy is staged: the first two
-   stages track real work, the rest are honest guesses at how a typical read
-   unfolds. */
+/* What the app says while an analysis runs. The AI reports no progress of its
+   own, so the stages are the app's honest account of a 15-60 second wait. */
 
 export type AnalyzeStep = 'preparing' | 'uploading' | 'reading';
+
+/* Where an in-flight run has got to, and when that step began. */
+export type AnalyzeProgress = { step: AnalyzeStep; startedAt: number };
 
 export type AnalyzingStage = {
   headline: string;
@@ -14,12 +15,10 @@ export type AnalyzingStage = {
 
 type ReadingStage = AnalyzingStage & { after: number };
 
-export const STAGE_COUNT = 5;
-
 const PREPARING: AnalyzingStage = {
   index: 0,
   headline: 'Getting your chart ready',
-  detail: 'Making the picture smaller so it uploads fast.',
+  detail: 'Shrinking it so the upload stays quick.',
 };
 
 const UPLOADING: AnalyzingStage = {
@@ -29,7 +28,7 @@ const UPLOADING: AnalyzingStage = {
 };
 
 /* The last entry shares its dot with the one before it: an overrun is the same
-   step taking too long, not a step the user was not told about. */
+   step taking too long, not a step the user was never told about. */
 const READING: ReadingStage[] = [
   {
     after: 0,
@@ -46,16 +45,18 @@ const READING: ReadingStage[] = [
   {
     after: 35_000,
     index: 4,
-    headline: 'Working out the call',
+    headline: 'Working out the strategy',
     detail: 'Turning what it sees into one clear suggestion.',
   },
   {
     after: 70_000,
     index: 4,
-    headline: 'Working out the call',
+    headline: 'Working out the strategy',
     detail: "This one is taking longer than usual. It's still going.",
   },
 ];
+
+export const STAGE_COUNT = READING[READING.length - 1].index + 1;
 
 export function analyzingStage(step: AnalyzeStep, elapsedMs: number): AnalyzingStage {
   if (step === 'preparing') return PREPARING;

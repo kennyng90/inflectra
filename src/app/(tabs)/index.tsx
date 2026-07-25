@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnalyzingProgress } from '@/components/analyzing-progress';
-import { Button } from '@/components/button';
+import { Button, BUTTON_HEIGHT } from '@/components/button';
 import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
@@ -20,8 +20,7 @@ const PICK_ERROR = "We couldn't open your photos. Try again.";
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { phase, chart, rejection, error, step, stepStartedAt, pickChart, submit, cancel } =
-    useAnalyzeFlow();
+  const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
   const [pickError, setPickError] = useState<string | null>(null);
 
   const analyzing = phase === 'analyzing';
@@ -29,10 +28,9 @@ export default function AnalyzeScreen() {
   const failed = phase === 'failed';
   const errorMessage = pickError ?? error;
 
-  /* Two stacked buttons. The actions area keeps that height in every phase so
-     the Chart preview above it never jumps when an overlay appears. */
-  const buttonHeight = theme.spacing.space12 * 2 + theme.lineHeight.body;
-  const actionsMinHeight = buttonHeight * 2 + theme.spacing.space12;
+  /* The actions area holds two stacked buttons' worth of height in every phase,
+     so the Chart preview above it never jumps when an overlay appears. */
+  const actionsMinHeight = BUTTON_HEIGHT * 2 + theme.spacing.space12;
 
   const pick = async () => {
     setPickError(null);
@@ -83,7 +81,7 @@ export default function AnalyzeScreen() {
           />
           {analyzing && (
             <ChartOverlay>
-              <AnalyzingProgress step={step} startedAt={stepStartedAt} />
+              <AnalyzingProgress progress={progress} />
             </ChartOverlay>
           )}
           {rejected && (
