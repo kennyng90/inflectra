@@ -163,6 +163,9 @@ site_url = "http://localhost:8081"
 additional_redirect_urls = [
   "http://localhost:8081",
   "http://localhost:8081/**",
+  # Second dev server port, for testing a worktree beside the main checkout.
+  "http://localhost:8087",
+  "http://localhost:8087/**",
   "inflectra://**",
   "com.kenng90.inflectra://**",
 ]

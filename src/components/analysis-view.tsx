@@ -2,14 +2,14 @@ import { Image } from 'expo-image';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Accordion } from '@/components/accordion';
-import type { Analysis, Trend } from '@/lib/analysis-contract';
+import { Pill, TrendPill } from '@/components/pill';
+import type { Analysis } from '@/lib/analysis-contract';
 import {
   DISCLAIMER,
   buildLadder,
   directionCopy,
   formatPercent,
   formatPrice,
-  trendCopy,
   type LadderRung,
 } from '@/lib/analysis-copy';
 import { useTheme, type Theme } from '@/theme';
@@ -22,12 +22,6 @@ const DELTA_COLUMN_WIDTH = 64;
 const DETAIL_LABEL_WIDTH = 104;
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
-const trendPillColors: Record<Trend, (theme: Theme) => { fill: string; text: string }> = {
-  bullish: (theme) => ({ fill: theme.colors.fillSuccessWeak, text: theme.colors.textSuccess }),
-  bearish: (theme) => ({ fill: theme.colors.fillErrorWeak, text: theme.colors.textError }),
-  sideways: (theme) => ({ fill: theme.colors.fillWeak, text: theme.colors.textWeak }),
-};
-
 const rungColors: Record<LadderRung['kind'], (theme: Theme) => { dot: string; delta: string }> = {
   target: (theme) => ({ dot: theme.colors.fillSuccessStrong, delta: theme.colors.textSuccess }),
   entry: (theme) => ({ dot: theme.colors.fillBrandStrong, delta: theme.colors.textWeak }),
@@ -37,24 +31,6 @@ const rungColors: Record<LadderRung['kind'], (theme: Theme) => { dot: string; de
 function Note({ children }: { children: string }) {
   const theme = useTheme();
   return <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>{children}</Text>;
-}
-
-function Pill({ fill, color, label }: { fill: string; color: string; label: string }) {
-  const theme = useTheme();
-
-  return (
-    <View
-      style={{
-        backgroundColor: fill,
-        borderRadius: theme.radius.rFull,
-        paddingHorizontal: theme.spacing.space12,
-        paddingVertical: theme.spacing.space4,
-      }}>
-      <Text style={{ ...theme.text.tiny, fontWeight: theme.fontWeight.strong, color }}>
-        {label}
-      </Text>
-    </View>
-  );
 }
 
 function BodyText({ children }: { children: string }) {
@@ -94,19 +70,6 @@ function ChartStrip({ uri, assetGuess }: { uri: string; assetGuess: string }) {
         />
       </View>
     </View>
-  );
-}
-
-function TrendPill({ trend }: { trend: Trend }) {
-  const theme = useTheme();
-  const colors = trendPillColors[trend](theme);
-
-  return (
-    <Pill
-      fill={colors.fill}
-      color={colors.text}
-      label={`${trendCopy[trend].arrow} ${trendCopy[trend].label}`}
-    />
   );
 }
 
