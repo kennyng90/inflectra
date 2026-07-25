@@ -46,3 +46,6 @@ example
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Agent worktrees
+.claude/worktrees/

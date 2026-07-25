@@ -1,7 +1,11 @@
 import { ActivityIndicator, Text } from 'react-native';
 
 import { OpacityPressable } from '@/components/opacity-pressable';
-import { useTheme } from '@/theme';
+import { lightTheme as tokens, useTheme } from '@/theme';
+
+/* Kept in step with the padding and text style below, for layouts that need to
+   hold a button's worth of height before one is rendered. */
+export const BUTTON_HEIGHT = tokens.spacing.space12 * 2 + tokens.lineHeight.body;
 
 type ButtonProps = {
   label: string;

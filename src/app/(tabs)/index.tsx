@@ -1,45 +1,61 @@
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/button';
+import { AnalyzingProgress } from '@/components/analyzing-progress';
+import { Button, BUTTON_HEIGHT } from '@/components/button';
+import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
+import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
+import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
 import { useTheme } from '@/theme';
 
-const PICK_ERROR = "We couldn't open your photos. Try again.";
+/* What a failed attempt to source a Chart left behind. */
+type CaptureNote = Extract<CaptureOutcome, { message: string }>;
 
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { phase, chart, message, pickChart, submit } = useAnalyzeFlow();
+  const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
   const [pickError, setPickError] = useState<string | null>(null);
+  const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
 
   const analyzing = phase === 'analyzing';
-  const note = pickError ?? message;
-  const noteIsError = pickError !== null || phase === 'failed';
+  const rejected = phase === 'rejected';
+  const failed = phase === 'failed';
+  const cameraOff = captureNote?.status === 'blocked';
+  const errorMessage = pickError ?? error;
+  const note = captureNote?.message;
+  /* A rejected Chart can't be analyzed again, and a camera that's off can't
+     take one, so whichever action can still move the user on leads. */
+  const lead = chart !== null && !rejected ? 'analyze' : cameraOff ? 'library' : 'camera';
+  /* The actions area holds two stacked buttons' worth of height in every phase,
+     so the Chart preview above it never jumps when an overlay appears. */
+  const actionsMinHeight = BUTTON_HEIGHT * 2 + theme.spacing.space12;
 
-  const pick = async () => {
-    setPickError(null);
-    try {
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 1,
-      });
-      const asset = picked.canceled ? null : picked.assets[0];
-      if (!asset) return;
-      pickChart({ uri: asset.uri, width: asset.width, height: asset.height });
-    } catch {
-      setPickError(PICK_ERROR);
-    }
+  const capture = async (source: () => Promise<CaptureOutcome>) => {
+    setCaptureNote(null);
+    const outcome = await source();
+    if (outcome.status === 'canceled') return;
+    if (outcome.status === 'picked') pickChart(outcome.chart);
+    else setCaptureNote(outcome);
   };
 
   const analyze = async () => {
+    setPickError(null);
+    /* Whatever the analysis has to say outranks a stale capture note. */
+    setCaptureNote(null);
     if (await submit()) router.push('/analysis');
+  };
+
+  const openSettings = () => {
+    /* react-native-web has no openSettings, and no web pick can be blocked. */
+    if (Platform.OS !== 'web') Linking.openSettings();
   };
 
   return (
@@ -66,40 +82,18 @@ export default function AnalyzeScreen() {
               flex: 1,
               borderRadius: theme.radius.r12,
               backgroundColor: theme.colors.backgroundAlternate,
-              opacity: analyzing ? 0.3 : 1,
+              opacity: analyzing || rejected ? 0.3 : 1,
             }}
           />
           {analyzing && (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: theme.spacing.space12,
-                  padding: theme.spacing.space20,
-                },
-              ]}>
-              <ActivityIndicator size="large" color={theme.colors.interactiveAction} />
-              <Text
-                accessibilityRole="alert"
-                style={{
-                  ...theme.text.body,
-                  fontWeight: theme.fontWeight.strong,
-                  color: theme.colors.textStrong,
-                  textAlign: 'center',
-                }}>
-                Reading your chart…
-              </Text>
-              <Text
-                style={{
-                  ...theme.text.small,
-                  color: theme.colors.textWeak,
-                  textAlign: 'center',
-                }}>
-                This usually takes under a minute.
-              </Text>
-            </View>
+            <ChartOverlay>
+              <AnalyzingProgress progress={progress} />
+            </ChartOverlay>
+          )}
+          {rejected && (
+            <ChartOverlay>
+              <RejectionNotice reason={rejection} />
+            </ChartOverlay>
           )}
         </View>
       )}
@@ -109,41 +103,54 @@ export default function AnalyzeScreen() {
           padding: theme.spacing.space20,
           paddingBottom: theme.spacing.space24,
           gap: theme.spacing.space12,
+          justifyContent: 'flex-end',
+          ...(chart === null ? {} : { minHeight: actionsMinHeight }),
         }}>
-        {note && !analyzing && (
-          <Text
-            accessibilityRole="alert"
-            style={{
-              ...theme.text.small,
-              color: noteIsError ? theme.colors.textError : theme.colors.textStrong,
-              textAlign: 'center',
-            }}>
-            {note}
-          </Text>
-        )}
-
-        {chart === null && <Button label="Choose a chart" onPress={pick} />}
-
-        {chart !== null && phase === 'rejected' && (
-          <Button label="Pick a different chart" onPress={pick} />
-        )}
-
-        {/* Kept mounted while analyzing so the preview doesn't jump; the
-            overlay carries the progress, so no second spinner here. */}
-        {chart !== null && phase !== 'rejected' && (
+        {analyzing ? (
+          <Button label="Cancel" variant="secondary" onPress={cancel} />
+        ) : (
           <>
+            {(errorMessage || note) && (
+              <Text
+                accessibilityRole="alert"
+                style={{
+                  ...theme.text.small,
+                  color: theme.colors.textError,
+                  textAlign: 'center',
+                }}>
+                {errorMessage || note}
+              </Text>
+            )}
+
+            {/* Kept mounted while analyzing so the preview doesn't jump; the
+                overlay carries the progress, so no second spinner here. */}
+            {lead === 'analyze' && (
+              <Button
+                label={failed ? 'Try again' : 'Analyze this chart'}
+                disabled={analyzing}
+                onPress={analyze}
+              />
+            )}
+
             <Button
-              label={phase === 'failed' ? 'Try again' : 'Analyze this chart'}
+              label="Take a photo"
+              variant={lead === 'camera' ? 'primary' : 'secondary'}
               disabled={analyzing}
-              onPress={analyze}
+              onPress={() => capture(takeChartPhoto)}
             />
             <Button
-              label="Pick a different chart"
-              variant="secondary"
+              label="Choose from photos"
+              variant={lead === 'library' ? 'primary' : 'secondary'}
               disabled={analyzing}
-              onPress={pick}
+              onPress={() => capture(chooseChartFromLibrary)}
             />
+
+            {/* Last in the stack: a repair step, not the way forward. */}
+            {cameraOff && !analyzing && (
+              <Button label="Open Settings" variant="secondary" onPress={openSettings} />
+            )}
           </>
+        )}
         )}
       </View>
     </SafeAreaView>
