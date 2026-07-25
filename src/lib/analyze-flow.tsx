@@ -1,8 +1,14 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { isRejection, type Analysis } from '@/lib/analysis-contract';
+import { type AnalyzeProgress } from '@/lib/analyzing-copy';
 import { useAuth } from '@/lib/auth';
-import { analyzeChart, analyzeErrorMessage, type PickedChart } from '@/lib/chart-analysis';
+import {
+  analyzeChart,
+  analyzeErrorMessage,
+  isCanceled,
+  type PickedChart,
+} from '@/lib/chart-analysis';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
@@ -16,9 +22,12 @@ type AnalyzeFlow = {
   /* Why the analysis never finished. */
   error: string | null;
   completed: CompletedAnalysis | null;
+  progress: AnalyzeProgress;
   pickChart: (chart: PickedChart) => void;
   /* Resolves true once a new Analysis is ready to open. */
   submit: () => Promise<boolean>;
+  /* Abandons the in-flight run and hands the Chart back, ready to retry. */
+  cancel: () => void;
 };
 
 const AnalyzeFlowContext = createContext<AnalyzeFlow | null>(null);
@@ -31,6 +40,8 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
   const [rejection, setRejection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState<CompletedAnalysis | null>(null);
+  const [progress, setProgress] = useState<AnalyzeProgress>({ step: 'preparing', startedAt: 0 });
+  const runRef = useRef<AbortController | null>(null);
 
   const value = useMemo<AnalyzeFlow>(() => {
     const clearVerdict = () => {
@@ -53,10 +64,16 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
     const submit = async (): Promise<boolean> => {
       if (!chart || phase === 'analyzing') return false;
       if (!userId) return fail('Sign in again to analyze this chart.');
+      const run = new AbortController();
+      runRef.current = run;
       setPhase('analyzing');
       clearVerdict();
+      setProgress({ step: 'preparing', startedAt: Date.now() });
       try {
-        const result = await analyzeChart(chart, userId);
+        const result = await analyzeChart(chart, userId, {
+          signal: run.signal,
+          onStep: (step) => setProgress({ step, startedAt: Date.now() }),
+        });
         if (isRejection(result)) {
           setPhase('rejected');
           setRejection(result.reason);
@@ -68,12 +85,31 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
         setPhase('idle');
         return true;
       } catch (error) {
+        /* Canceling was deliberate, so the Chart just comes back unexplained. */
+        if (isCanceled(error)) {
+          setPhase('ready');
+          return false;
+        }
         return fail(analyzeErrorMessage(error));
+      } finally {
+        runRef.current = null;
       }
     };
 
-    return { phase, chart, rejection, error, completed, pickChart, submit };
-  }, [phase, chart, rejection, error, completed, userId]);
+    const cancel = () => runRef.current?.abort();
+
+    return {
+      phase,
+      chart,
+      rejection,
+      error,
+      completed,
+      progress,
+      pickChart,
+      submit,
+      cancel,
+    };
+  }, [phase, chart, rejection, error, completed, progress, userId]);
 
   return <AnalyzeFlowContext.Provider value={value}>{children}</AnalyzeFlowContext.Provider>;
 }
