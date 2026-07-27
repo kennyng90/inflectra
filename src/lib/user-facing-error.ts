@@ -7,6 +7,19 @@ export class UserFacingError extends Error {
   }
 }
 
+/* A failure that will fail the same way next time, so nothing is gained by
+   offering the user a retry. */
+export class PermanentError extends UserFacingError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PermanentError';
+  }
+}
+
+export function isPermanent(error: unknown): boolean {
+  return error instanceof PermanentError;
+}
+
 export function userFacingMessage(error: unknown, fallback: string): string {
   return error instanceof UserFacingError ? error.message : fallback;
 }

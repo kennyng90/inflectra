@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Accordion } from '@/components/accordion';
@@ -38,7 +39,15 @@ function BodyText({ children }: { children: string }) {
   return <Text style={{ ...theme.text.body, color: theme.colors.textStrong }}>{children}</Text>;
 }
 
-function ChartStrip({ uri, assetGuess }: { uri: string; assetGuess: string }) {
+function ChartStrip({
+  uri,
+  cacheKey,
+  assetGuess,
+}: {
+  uri: string | null;
+  cacheKey?: string;
+  assetGuess: string;
+}) {
   const theme = useTheme();
 
   return (
@@ -49,7 +58,7 @@ function ChartStrip({ uri, assetGuess }: { uri: string; assetGuess: string }) {
       }}>
       <Image
         accessibilityLabel="The chart you analyzed"
-        source={{ uri }}
+        source={uri ? { uri, cacheKey } : null}
         contentFit="contain"
         style={{
           width: '100%',
@@ -57,6 +66,21 @@ function ChartStrip({ uri, assetGuess }: { uri: string; assetGuess: string }) {
           backgroundColor: theme.colors.backgroundAlternate,
         }}
       />
+      {uri === null && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: theme.spacing.space20,
+            },
+          ]}>
+          <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak, textAlign: 'center' }}>
+            The chart didn&apos;t load, but the analysis of it is below.
+          </Text>
+        </View>
+      )}
       <View
         style={{
           position: 'absolute',
@@ -218,7 +242,19 @@ function priceList(levels: number[]): string {
   return levels.length === 0 ? 'None found' : levels.map(formatPrice).join(', ');
 }
 
-export function AnalysisView({ analysis, chartUri }: { analysis: Analysis; chartUri: string }) {
+export function AnalysisView({
+  analysis,
+  chartUri,
+  /* Keyed by storage path for a saved Chart, whose signed URL changes every
+     time it is opened and would otherwise re-download. */
+  chartCacheKey,
+  footer,
+}: {
+  analysis: Analysis;
+  chartUri: string | null;
+  chartCacheKey?: string;
+  footer?: ReactNode;
+}) {
   const theme = useTheme();
   const strategy = analysis.strategy;
   const copy = directionCopy[strategy.direction];
@@ -227,7 +263,7 @@ export function AnalysisView({ analysis, chartUri }: { analysis: Analysis; chart
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.space32 }}>
-      <ChartStrip uri={chartUri} assetGuess={analysis.asset_guess} />
+      <ChartStrip uri={chartUri} cacheKey={chartCacheKey} assetGuess={analysis.asset_guess} />
 
       <View style={{ padding: theme.spacing.space20, gap: theme.spacing.space16 }}>
         <View
@@ -322,6 +358,8 @@ export function AnalysisView({ analysis, chartUri }: { analysis: Analysis; chart
         }}>
         {DISCLAIMER}
       </Text>
+
+      {footer}
     </ScrollView>
   );
 }

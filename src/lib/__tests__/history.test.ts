@@ -1,13 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  HISTORY_DELETE_ERROR,
+  HISTORY_ENTRY_LOAD_ERROR,
+  HISTORY_ENTRY_MISSING,
+  HISTORY_ENTRY_UNREADABLE,
   HISTORY_LOAD_ERROR,
+  deleteHistoryEntry,
   fetchHistory,
+  fetchSavedAnalysis,
   formatHistoryDate,
   toHistoryEntry,
   type HistoryRecord,
 } from '../history';
-import { userFacingMessage } from '../user-facing-error';
+import { isPermanent, userFacingMessage } from '../user-facing-error';
 
 const analysis = {
   is_chart: true,
@@ -162,6 +168,147 @@ describe('fetchHistory', () => {
 
   it('fails when the server connection is not set up', async () => {
     await expect(fetchHistory(null)).rejects.toThrow(/connection/i);
+  });
+});
+
+type SingleResult = { data: unknown; error: unknown };
+
+function fakeEntryClient(
+  single: SingleResult,
+  sign: { data: { signedUrl: string } | null; error: unknown } = {
+    data: { signedUrl: 'https://signed/1' },
+    error: null,
+  },
+) {
+  const maybeSingle = jest.fn().mockResolvedValue(single);
+  const eq = jest.fn(() => ({ maybeSingle }));
+  const select = jest.fn(() => ({ eq }));
+  const from = jest.fn(() => ({ select }));
+  const createSignedUrl = jest.fn().mockResolvedValue(sign);
+  const storageFrom = jest.fn(() => ({ createSignedUrl }));
+  const client = { from, storage: { from: storageFrom } } as unknown as SupabaseClient;
+  return { client, from, select, eq, maybeSingle, storageFrom, createSignedUrl };
+}
+
+describe('fetchSavedAnalysis', () => {
+  it('reads back the whole Analysis with a signed Chart URL', async () => {
+    const { client, from, eq, storageFrom, createSignedUrl } = fakeEntryClient({
+      data: row(),
+      error: null,
+    });
+
+    const saved = await fetchSavedAnalysis('row-1', client);
+
+    expect(from).toHaveBeenCalledWith('analyses');
+    expect(eq).toHaveBeenCalledWith('id', 'row-1');
+    expect(storageFrom).toHaveBeenCalledWith('charts');
+    expect(createSignedUrl).toHaveBeenCalledWith('user-1/chart-1.jpg', expect.any(Number));
+    expect(saved).toEqual({
+      id: 'row-1',
+      storagePath: 'user-1/chart-1.jpg',
+      createdAt: '2026-07-25T09:00:00.000Z',
+      analysis,
+      chartUrl: 'https://signed/1',
+    });
+  });
+
+  it('still opens the Analysis when signing the Chart fails', async () => {
+    const { client } = fakeEntryClient(
+      { data: row(), error: null },
+      { data: null, error: new Error('nope') },
+    );
+
+    await expect(fetchSavedAnalysis('row-1', client)).resolves.toMatchObject({ chartUrl: null });
+  });
+
+  it('fails with a message the user can act on', async () => {
+    const { client } = fakeEntryClient({ data: null, error: new Error('offline') });
+
+    await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_LOAD_ERROR);
+  });
+
+  it('says so plainly when the Analysis is already deleted', async () => {
+    const { client } = fakeEntryClient({ data: null, error: null });
+
+    await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_MISSING);
+  });
+
+  it('says so plainly when the saved Analysis no longer reads', async () => {
+    const { client } = fakeEntryClient({ data: row({ analysis: { trend: 'upwards' } }), error: null });
+
+    await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_UNREADABLE);
+  });
+
+  it('marks what cannot be retried, and only that', async () => {
+    const gone = fakeEntryClient({ data: null, error: null });
+    const unreadable = fakeEntryClient({ data: row({ analysis: null }), error: null });
+    const offline = fakeEntryClient({ data: null, error: new Error('offline') });
+
+    expect(isPermanent(await fetchSavedAnalysis('row-1', gone.client).catch((e) => e))).toBe(true);
+    expect(isPermanent(await fetchSavedAnalysis('row-1', unreadable.client).catch((e) => e))).toBe(
+      true,
+    );
+    expect(isPermanent(await fetchSavedAnalysis('row-1', offline.client).catch((e) => e))).toBe(
+      false,
+    );
+  });
+
+  it('fails when the server connection is not set up', async () => {
+    await expect(fetchSavedAnalysis('row-1', null)).rejects.toThrow(/connection/i);
+  });
+});
+
+function fakeDeleteClient(
+  remove: { error: unknown } = { error: null },
+  del: { error: unknown } = { error: null },
+) {
+  const calls: string[] = [];
+  const eq = jest.fn(async () => {
+    calls.push('row');
+    return del;
+  });
+  const deleteRow = jest.fn(() => ({ eq }));
+  const from = jest.fn(() => ({ delete: deleteRow }));
+  const removeObject = jest.fn(async () => {
+    calls.push('image');
+    return remove;
+  });
+  const storageFrom = jest.fn(() => ({ remove: removeObject }));
+  const client = { from, storage: { from: storageFrom } } as unknown as SupabaseClient;
+  return { client, calls, from, eq, removeObject, storageFrom };
+}
+
+const entry = { id: 'row-1', storagePath: 'user-1/chart-1.jpg' };
+
+describe('deleteHistoryEntry', () => {
+  it('takes the Chart image out of storage before the row', async () => {
+    const { client, calls, from, eq, storageFrom, removeObject } = fakeDeleteClient();
+
+    await deleteHistoryEntry(entry, client);
+
+    expect(storageFrom).toHaveBeenCalledWith('charts');
+    expect(removeObject).toHaveBeenCalledWith(['user-1/chart-1.jpg']);
+    expect(from).toHaveBeenCalledWith('analyses');
+    expect(eq).toHaveBeenCalledWith('id', 'row-1');
+    /* Image first: a retry after a half-done delete finds the row still listed. */
+    expect(calls).toEqual(['image', 'row']);
+  });
+
+  it('keeps the row when the Chart image will not go', async () => {
+    const { client, eq } = fakeDeleteClient({ error: new Error('offline') });
+
+    await expect(deleteHistoryEntry(entry, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+    expect(eq).not.toHaveBeenCalled();
+  });
+
+  it('fails with a message the user can act on when the row will not go', async () => {
+    const { client } = fakeDeleteClient({ error: null }, { error: new Error('offline') });
+
+    await expect(deleteHistoryEntry(entry, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+  });
+
+  it('fails when the server connection is not set up', async () => {
+    await expect(deleteHistoryEntry(entry, null)).rejects.toThrow(/connection/i);
   });
 });
 

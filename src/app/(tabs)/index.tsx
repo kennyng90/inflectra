@@ -1,14 +1,13 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Text, View } from 'react-native';
+import { Linking, Platform, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button, BUTTON_HEIGHT } from '@/components/button';
 import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
-import { ErrorNotice } from '@/components/error-notice';
 import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
@@ -150,7 +149,6 @@ export default function AnalyzeScreen() {
               <Button label="Open Settings" variant="secondary" onPress={openSettings} />
             )}
           </>
-        )}
         )}
       </View>
     </SafeAreaView>

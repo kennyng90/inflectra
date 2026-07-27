@@ -1,19 +1,32 @@
 import { ActivityIndicator, Text } from 'react-native';
 
 import { OpacityPressable } from '@/components/opacity-pressable';
-import { lightTheme as tokens, useTheme } from '@/theme';
+import { lightTheme as tokens, useTheme, type Theme } from '@/theme';
 
 /* Kept in step with the padding and text style below, for layouts that need to
    hold a button's worth of height before one is rendered. */
 export const BUTTON_HEIGHT = tokens.spacing.space12 * 2 + tokens.lineHeight.body;
 
+/* `danger` is the app's one destructive look: red on a red tint, quiet enough
+   that it never reads as the way forward. */
+type Variant = 'primary' | 'secondary' | 'danger';
+
 type ButtonProps = {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
+  variant?: Variant;
   loading?: boolean;
   disabled?: boolean;
   accessibilityLabel?: string;
+};
+
+const variantColors: Record<Variant, (theme: Theme) => { fill: string; label: string }> = {
+  primary: (theme) => ({
+    fill: theme.colors.interactiveAction,
+    label: theme.colors.textInverseStrong,
+  }),
+  secondary: (theme) => ({ fill: theme.colors.fillWeak, label: theme.colors.textStrong }),
+  danger: (theme) => ({ fill: theme.colors.fillErrorWeak, label: theme.colors.textError }),
 };
 
 export function Button({
@@ -26,18 +39,12 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme();
   const inactive = disabled || loading;
-  const primary = variant === 'primary';
+  const colors = variantColors[variant](theme);
 
-  const backgroundColor = primary
-    ? inactive
-      ? theme.colors.fillDisabled
-      : theme.colors.interactiveAction
-    : theme.colors.fillWeak;
-  const color = inactive
-    ? theme.colors.textWeak
-    : primary
-      ? theme.colors.textInverseStrong
-      : theme.colors.textStrong;
+  /* Only the filled button greys out; the quiet ones just lose their label. */
+  const backgroundColor =
+    inactive && variant === 'primary' ? theme.colors.fillDisabled : colors.fill;
+  const color = inactive ? theme.colors.textWeak : colors.label;
 
   return (
     <OpacityPressable

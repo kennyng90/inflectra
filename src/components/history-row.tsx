@@ -1,6 +1,9 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
+import { OpacityPressable } from '@/components/opacity-pressable';
 import { TrendPill } from '@/components/pill';
 import type { Direction } from '@/lib/analysis-contract';
 import { directionCopy, trendCopy } from '@/lib/analysis-copy';
@@ -12,6 +15,22 @@ import { useTheme, type Theme } from '@/theme';
 export const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 48;
 
+/* The iOS list accessory that says a row opens something. */
+function Chevron() {
+  const theme = useTheme();
+
+  return Platform.OS === 'ios' ? (
+    <SymbolView
+      name="chevron.right"
+      size={theme.spacing.space16}
+      weight="semibold"
+      tintColor={theme.colors.iconNeutral}
+    />
+  ) : (
+    <Text style={{ ...theme.text.small, color: theme.colors.iconNeutral }}>{'›'}</Text>
+  );
+}
+
 const directionColor: Record<Direction, (theme: Theme) => string> = {
   long: (theme) => theme.colors.textSuccess,
   short: (theme) => theme.colors.textError,
@@ -20,13 +39,19 @@ const directionColor: Record<Direction, (theme: Theme) => string> = {
 
 export function HistoryRow({ entry }: { entry: HistoryEntry }) {
   const theme = useTheme();
+  const router = useRouter();
   const direction = directionCopy[entry.direction].headline;
   const date = formatHistoryDate(entry.createdAt);
 
   return (
-    <View
+    <OpacityPressable
       accessible
+      accessibilityRole="button"
       accessibilityLabel={`${entry.assetGuess}. ${direction}. ${trendCopy[entry.trend].label}. ${date}.`}
+      accessibilityHint="Opens the full analysis"
+      /* Rows sit edge to edge, so any slop would reach into the neighbour. */
+      hitSlop={0}
+      onPress={() => router.push({ pathname: '/history/[id]', params: { id: entry.id } })}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -73,6 +98,7 @@ export function HistoryRow({ entry }: { entry: HistoryEntry }) {
       </View>
 
       <TrendPill trend={entry.trend} />
-    </View>
+      <Chevron />
+    </OpacityPressable>
   );
 }
