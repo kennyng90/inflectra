@@ -19,19 +19,6 @@ const JPEG_QUALITY = 0.8;
 export const GENERIC_ANALYZE_ERROR =
   "The analysis didn't go through. Check your connection and try again.";
 
-
-/* An expected failure whose message is safe to show the user as-is. */
-export class AnalyzeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'AnalyzeError';
-  }
-}
-
-export function analyzeErrorMessage(error: unknown): string {
-  return error instanceof AnalyzeError ? error.message : GENERIC_ANALYZE_ERROR;
-}
-
 /* The user walked away from the run; nothing to report and nothing to fix. */
 export class CanceledError extends Error {
   constructor() {
@@ -161,7 +148,7 @@ export async function analyzeChart(
 
   const { error: uploadError } = await upload;
   if (uploadError) {
-    throw new AnalyzeError("We couldn't upload your chart. Check your connection and try again.");
+    throw new UserFacingError("We couldn't upload your chart. Check your connection and try again.");
   }
 
   onStep?.('reading');

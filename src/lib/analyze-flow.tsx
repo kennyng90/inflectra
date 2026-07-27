@@ -5,10 +5,11 @@ import { type AnalyzeProgress } from '@/lib/analyzing-copy';
 import { useAuth } from '@/lib/auth';
 import {
   analyzeChart,
-  analyzeErrorMessage,
+  GENERIC_ANALYZE_ERROR,
   isCanceled,
   type PickedChart,
 } from '@/lib/chart-analysis';
+import { userFacingMessage } from '@/lib/user-facing-error';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
@@ -90,7 +91,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
           setPhase('ready');
           return false;
         }
-        return fail(analyzeErrorMessage(error));
+        return fail(userFacingMessage(error, GENERIC_ANALYZE_ERROR));
       } finally {
         runRef.current = null;
       }
