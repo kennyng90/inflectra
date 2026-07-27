@@ -1,10 +1,12 @@
 import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppleSignInButton } from '@/components/apple-sign-in-button';
 import { Button } from '@/components/button';
 import { OpacityPressable } from '@/components/opacity-pressable';
+import { useAppleSignInAvailable } from '@/lib/apple-auth';
 import { useAuth } from '@/lib/auth';
 import { isValidEmail } from '@/lib/magic-link';
 import { supabase } from '@/lib/supabase';
@@ -49,23 +51,53 @@ function useResendCooldown() {
   return { secondsLeft, start };
 }
 
+function OrDivider() {
+  const theme = useTheme();
+  const rule = {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.strokeWeak,
+  } as const;
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.space12,
+        marginVertical: theme.spacing.space16,
+      }}>
+      <View style={rule} />
+      <Text style={{ ...theme.text.small, color: theme.colors.textWeak }}>or</Text>
+      <View style={rule} />
+    </View>
+  );
+}
+
 export default function SignInScreen() {
   const theme = useTheme();
   const { linkError, clearLinkError } = useAuth();
+  const appleAvailable = useAppleSignInAvailable();
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [appleError, setAppleError] = useState<string | null>(null);
   const cooldown = useResendCooldown();
 
   const canSend = supabase !== null && isValidEmail(email) && !sending;
-  const error = sendError ?? linkError;
+  const error = appleError ?? sendError ?? linkError;
+
+  const clearErrors = () => {
+    setSendError(null);
+    setAppleError(null);
+    clearLinkError();
+  };
 
   const sendLink = async (address: string) => {
     if (!supabase) return;
     setSending(true);
-    setSendError(null);
-    clearLinkError();
+    clearErrors();
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email: address,
       options: { emailRedirectTo: redirectUrl() },
@@ -126,44 +158,49 @@ export default function SignInScreen() {
             }}>
             {sentTo
               ? `We sent a sign-in link to ${sentTo}. Open it on this device to continue.`
-              : 'Sign in with your email to analyze charts and keep your history.'}
+              : 'Sign in to analyze charts and keep your history.'}
           </Text>
         </View>
 
         {sentTo === null ? (
-          <View style={{ gap: theme.spacing.space12 }}>
-            <TextInput
-              accessibilityLabel="Email address"
-              style={inputStyle}
-              value={email}
-              onChangeText={(value) => {
-                setEmail(value);
-                setSendError(null);
-              }}
-              placeholder="you@example.com"
-              placeholderTextColor={theme.colors.textWeak}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              editable={!sending}
-              onSubmitEditing={() => canSend && sendLink(email.trim())}
-            />
-            <Button
-              label={sending ? 'Sending…' : 'Send sign-in link'}
-              accessibilityLabel="Send sign-in link"
-              loading={sending}
-              disabled={!canSend}
-              onPress={() => sendLink(email.trim())}
-            />
-            {supabase === null && (
-              <Text
-                style={{ ...theme.text.small, color: theme.colors.textWeak, textAlign: 'center' }}>
-                The server connection isn&apos;t set up yet. Add the Supabase keys and restart the
-                app.
-              </Text>
-            )}
+          <View>
+            <AppleSignInButton onStart={clearErrors} onError={setAppleError} />
+            {appleAvailable && <OrDivider />}
+            <View style={{ gap: theme.spacing.space12 }}>
+              <TextInput
+                accessibilityLabel="Email address"
+                style={inputStyle}
+                value={email}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setSendError(null);
+                  setAppleError(null);
+                }}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.colors.textWeak}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                editable={!sending}
+                onSubmitEditing={() => canSend && sendLink(email.trim())}
+              />
+              <Button
+                label={sending ? 'Sending…' : 'Send sign-in link'}
+                accessibilityLabel="Send sign-in link"
+                loading={sending}
+                disabled={!canSend}
+                onPress={() => sendLink(email.trim())}
+              />
+              {supabase === null && (
+                <Text
+                  style={{ ...theme.text.small, color: theme.colors.textWeak, textAlign: 'center' }}>
+                  The server connection isn&apos;t set up yet. Add the Supabase keys and restart the
+                  app.
+                </Text>
+              )}
+            </View>
           </View>
         ) : (
           <View style={{ gap: theme.spacing.space12 }}>
@@ -189,8 +226,7 @@ export default function SignInScreen() {
               accessibilityLabel="Use a different email"
               onPress={() => {
                 setSentTo(null);
-                setSendError(null);
-                clearLinkError();
+                clearErrors();
               }}
               style={{ alignItems: 'center', paddingVertical: theme.spacing.space8 }}>
               <Text style={{ ...theme.text.body, color: theme.colors.textWeak }}>
