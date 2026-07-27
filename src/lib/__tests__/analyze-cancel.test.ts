@@ -2,13 +2,7 @@
    cancel drives analyzeChart against a fake client and checks what got undone. */
 import { analyzeChart, CanceledError, isCanceled } from '../chart-analysis';
 import type { AnalyzeStep } from '../analyzing-copy';
-
-jest.mock('@/lib/supabase', () => ({
-  /* A getter, so the fake below is built before it is ever read. */
-  get supabase() {
-    return mockClient;
-  },
-}));
+import type { AnalysisStoreClient } from '../analysis-store';
 
 jest.mock('expo-image-manipulator', () => ({
   ImageManipulator: {
@@ -29,7 +23,7 @@ jest.mock('expo-file-system', () => ({
 }));
 
 const removed: string[][] = [];
-const deleted: { table: string; column: string; value: string }[] = [];
+const deleted: { column: string; value: string }[] = [];
 const uploaded: string[] = [];
 let resolveInvoke: ((value: { data: unknown; error: unknown }) => void) | null = null;
 /* Lets a test hold the upload open and cancel mid-flight. */
@@ -55,15 +49,16 @@ const mockClient = {
         resolveInvoke = resolve as typeof resolveInvoke;
       }),
   },
-  from: (table: string) => ({
+  from: () => ({
     delete: () => ({
       eq: (column: string, value: string) => {
-        deleted.push({ table, column, value });
+        deleted.push({ column, value });
         return Promise.resolve({ error: null });
       },
     }),
   }),
 };
+const client = mockClient as unknown as AnalysisStoreClient;
 
 const chart = { uri: 'file:///picked.jpg', width: 1200, height: 800 };
 
@@ -102,7 +97,7 @@ beforeEach(() => {
 describe('analyzeChart cancellation', () => {
   it('reports each step so the wait can show staged progress', async () => {
     const steps: AnalyzeStep[] = [];
-    const run = analyzeChart(chart, 'user-1', { onStep: (step) => steps.push(step) });
+    const run = analyzeChart(chart, 'user-1', { onStep: (step) => steps.push(step) }, client);
     await settle();
     resolveInvoke!({ data: analysis, error: null });
     await run;
@@ -112,7 +107,7 @@ describe('analyzeChart cancellation', () => {
 
   it('stops waiting as soon as the user cancels', async () => {
     const controller = new AbortController();
-    const run = analyzeChart(chart, 'user-1', { signal: controller.signal });
+    const run = analyzeChart(chart, 'user-1', { signal: controller.signal }, client);
     await settle();
 
     controller.abort();
@@ -121,7 +116,7 @@ describe('analyzeChart cancellation', () => {
 
   it('undoes the saved Analysis when the canceled run finishes anyway', async () => {
     const controller = new AbortController();
-    const run = analyzeChart(chart, 'user-1', { signal: controller.signal });
+    const run = analyzeChart(chart, 'user-1', { signal: controller.signal }, client);
     await settle();
     controller.abort();
     await expect(run).rejects.toThrow();
@@ -130,7 +125,7 @@ describe('analyzeChart cancellation', () => {
     resolveInvoke!({ data: analysis, error: null });
     await settle();
 
-    expect(deleted).toEqual([{ table: 'analyses', column: 'storage_path', value: uploaded[0] }]);
+    expect(deleted).toEqual([{ column: 'storage_path', value: uploaded[0] }]);
     expect(removed).toEqual([[uploaded[0]]]);
   });
 
@@ -139,7 +134,7 @@ describe('analyzeChart cancellation', () => {
     holdUpload = () => new Promise<void>((resolve) => { finishUpload = resolve; });
 
     const controller = new AbortController();
-    const run = analyzeChart(chart, 'user-1', { signal: controller.signal });
+    const run = analyzeChart(chart, 'user-1', { signal: controller.signal }, client);
     await settle();
 
     controller.abort();
@@ -161,7 +156,7 @@ describe('analyzeChart cancellation', () => {
     controller.abort();
 
     await expect(
-      analyzeChart(chart, 'user-1', { signal: controller.signal }),
+      analyzeChart(chart, 'user-1', { signal: controller.signal }, client),
     ).rejects.toBeInstanceOf(CanceledError);
     expect(uploaded).toEqual([]);
   });

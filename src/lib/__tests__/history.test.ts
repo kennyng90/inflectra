@@ -1,5 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-
 import {
   HISTORY_DELETE_ERROR,
   HISTORY_ENTRY_LOAD_ERROR,
@@ -13,6 +11,7 @@ import {
   toHistoryEntry,
   type HistoryRecord,
 } from '../history';
+import type { AnalysisStoreClient } from '../analysis-store';
 import { isPermanent, userFacingMessage } from '../user-facing-error';
 
 const analysis = {
@@ -54,7 +53,7 @@ function fakeClient(query: QueryResult, sign: SignResult = { data: [], error: nu
   const from = jest.fn(() => ({ select }));
   const createSignedUrls = jest.fn().mockResolvedValue(sign);
   const storageFrom = jest.fn(() => ({ createSignedUrls }));
-  const client = { from, storage: { from: storageFrom } } as unknown as SupabaseClient;
+  const client = { from, storage: { from: storageFrom } } as unknown as AnalysisStoreClient;
   return { client, from, select, order, storageFrom, createSignedUrls };
 }
 
@@ -117,9 +116,9 @@ describe('fetchHistory', () => {
 
     const entries = await fetchHistory(client);
 
-    expect(from).toHaveBeenCalledWith('analyses');
+    expect(from).toHaveBeenCalledTimes(1);
     expect(order).toHaveBeenCalledWith('created_at', { ascending: false });
-    expect(storageFrom).toHaveBeenCalledWith('charts');
+    expect(storageFrom).toHaveBeenCalledTimes(1);
     expect(createSignedUrls).toHaveBeenCalledWith(
       ['user-1/chart-1.jpg', 'user-1/chart-2.jpg'],
       expect.any(Number),
@@ -186,7 +185,7 @@ function fakeEntryClient(
   const from = jest.fn(() => ({ select }));
   const createSignedUrl = jest.fn().mockResolvedValue(sign);
   const storageFrom = jest.fn(() => ({ createSignedUrl }));
-  const client = { from, storage: { from: storageFrom } } as unknown as SupabaseClient;
+  const client = { from, storage: { from: storageFrom } } as unknown as AnalysisStoreClient;
   return { client, from, select, eq, maybeSingle, storageFrom, createSignedUrl };
 }
 
@@ -199,9 +198,9 @@ describe('fetchSavedAnalysis', () => {
 
     const saved = await fetchSavedAnalysis('row-1', client);
 
-    expect(from).toHaveBeenCalledWith('analyses');
+    expect(from).toHaveBeenCalledTimes(1);
     expect(eq).toHaveBeenCalledWith('id', 'row-1');
-    expect(storageFrom).toHaveBeenCalledWith('charts');
+    expect(storageFrom).toHaveBeenCalledTimes(1);
     expect(createSignedUrl).toHaveBeenCalledWith('user-1/chart-1.jpg', expect.any(Number));
     expect(saved).toEqual({
       id: 'row-1',
@@ -261,54 +260,74 @@ describe('fetchSavedAnalysis', () => {
 function fakeDeleteClient(
   remove: { error: unknown } = { error: null },
   del: { error: unknown } = { error: null },
+  lookup: { data: { storage_path: string } | null; error: unknown } = {
+    data: { storage_path: 'user-1/chart-1.jpg' },
+    error: null,
+  },
 ) {
   const calls: string[] = [];
-  const eq = jest.fn(async () => {
+  const deleteEq = jest.fn(async () => {
     calls.push('row');
     return del;
   });
-  const deleteRow = jest.fn(() => ({ eq }));
-  const from = jest.fn(() => ({ delete: deleteRow }));
+  const deleteRow = jest.fn(() => ({ eq: deleteEq }));
+  const maybeSingle = jest.fn().mockResolvedValue(lookup);
+  const selectEq = jest.fn(() => ({ maybeSingle }));
+  const select = jest.fn(() => ({ eq: selectEq }));
+  const from = jest.fn(() => ({ delete: deleteRow, select }));
   const removeObject = jest.fn(async () => {
-    calls.push('image');
+    calls.push('chart');
     return remove;
   });
   const storageFrom = jest.fn(() => ({ remove: removeObject }));
-  const client = { from, storage: { from: storageFrom } } as unknown as SupabaseClient;
-  return { client, calls, from, eq, removeObject, storageFrom };
+  const client = { from, storage: { from: storageFrom } } as unknown as AnalysisStoreClient;
+  return { client, calls, deleteEq, from, removeObject, selectEq, storageFrom };
 }
 
 const entry = { id: 'row-1', storagePath: 'user-1/chart-1.jpg' };
 
 describe('deleteHistoryEntry', () => {
-  it('takes the Chart image out of storage before the row', async () => {
-    const { client, calls, from, eq, storageFrom, removeObject } = fakeDeleteClient();
+  it('takes the Chart out of storage before the row', async () => {
+    const { client, calls, deleteEq, from, selectEq, storageFrom, removeObject } =
+      fakeDeleteClient();
 
-    await deleteHistoryEntry(entry, client);
+    await deleteHistoryEntry(entry.id, client);
 
-    expect(storageFrom).toHaveBeenCalledWith('charts');
+    expect(storageFrom).toHaveBeenCalledTimes(1);
     expect(removeObject).toHaveBeenCalledWith(['user-1/chart-1.jpg']);
-    expect(from).toHaveBeenCalledWith('analyses');
-    expect(eq).toHaveBeenCalledWith('id', 'row-1');
-    /* Image first: a retry after a half-done delete finds the row still listed. */
-    expect(calls).toEqual(['image', 'row']);
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(selectEq).toHaveBeenCalledWith('id', 'row-1');
+    expect(deleteEq).toHaveBeenCalledWith('id', 'row-1');
+    /* Chart first: a retry after a half-done delete finds the row still listed. */
+    expect(calls).toEqual(['chart', 'row']);
   });
 
   it('keeps the row when the Chart image will not go', async () => {
-    const { client, eq } = fakeDeleteClient({ error: new Error('offline') });
+    const { client, deleteEq } = fakeDeleteClient({ error: new Error('offline') });
 
-    await expect(deleteHistoryEntry(entry, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
-    expect(eq).not.toHaveBeenCalled();
+    await expect(deleteHistoryEntry(entry.id, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+    expect(deleteEq).not.toHaveBeenCalled();
   });
 
   it('fails with a message the user can act on when the row will not go', async () => {
     const { client } = fakeDeleteClient({ error: null }, { error: new Error('offline') });
 
-    await expect(deleteHistoryEntry(entry, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+    await expect(deleteHistoryEntry(entry.id, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+  });
+
+  it('fails with a message the user can act on when the pair cannot be found', async () => {
+    const { client, storageFrom } = fakeDeleteClient(
+      { error: null },
+      { error: null },
+      { data: null, error: new Error('offline') },
+    );
+
+    await expect(deleteHistoryEntry(entry.id, client)).rejects.toThrow(HISTORY_DELETE_ERROR);
+    expect(storageFrom).not.toHaveBeenCalled();
   });
 
   it('fails when the server connection is not set up', async () => {
-    await expect(deleteHistoryEntry(entry, null)).rejects.toThrow(/connection/i);
+    await expect(deleteHistoryEntry(entry.id, null)).rejects.toThrow(/connection/i);
   });
 });
 

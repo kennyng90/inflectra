@@ -1,19 +1,19 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { File as FileSystemFile } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 
 import { analysisResultSchema, type AnalysisResult } from '@/lib/analysis-contract';
+import {
+  createAnalysisStore,
+  type AnalysisStoreClient,
+} from '@/lib/analysis-store';
 import { type AnalyzeStep } from '@/lib/analyzing-copy';
-import { supabase } from '@/lib/supabase';
-import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
+import { UserFacingError } from '@/lib/user-facing-error';
 
 /* Longest edge the app uploads: enough detail for the AI to read price levels,
    small enough to keep uploads and analysis fast. */
 export const MAX_CHART_EDGE = 2000;
 
-const BUCKET = 'charts';
-const CONTENT_TYPE = 'image/jpeg';
 const JPEG_QUALITY = 0.8;
 
 export const GENERIC_ANALYZE_ERROR =
@@ -74,20 +74,6 @@ async function readChartBytes(uri: string): Promise<Uint8Array> {
   return new FileSystemFile(uri).bytes();
 }
 
-function chartObjectName(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-}
-
-/* A canceled run leaves no trace: the Chart goes, and so does the History row
-   the Edge Function saved after the app stopped listening. */
-async function discardRun(client: SupabaseClient, storagePath: string): Promise<void> {
-  /* Independently, so one failing half still leaves the other cleaned up. */
-  await Promise.allSettled([
-    client.storage.from(BUCKET).remove([storagePath]),
-    client.from('analyses').delete().eq('storage_path', storagePath),
-  ]);
-}
-
 export type AnalyzeOptions = {
   /* Aborted when the user cancels the wait. */
   signal?: AbortSignal;
@@ -121,24 +107,22 @@ export async function analyzeChart(
   chart: PickedChart,
   userId: string,
   { signal, onStep }: AnalyzeOptions = {},
+  client?: AnalysisStoreClient | null,
 ): Promise<AnalysisResult> {
-  const client = supabase;
-  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
+  const store = createAnalysisStore(client);
 
   onStep?.('preparing');
   const preparedUri = await prepareChart(chart);
-  const storagePath = `${userId}/${chartObjectName()}`;
+  const storagePath = store.createStoragePath(userId);
   const bytes = await readChartBytes(preparedUri);
   if (signal?.aborted) throw new CanceledError();
 
   /* Only a saved Analysis earns its Chart a place in storage: a Rejection or a
      failure leaves the upload behind, so drop it. */
-  const discardChart = () => client.storage.from(BUCKET).remove([storagePath]);
+  const discardChart = () => store.removeChart(storagePath);
 
   onStep?.('uploading');
-  const upload = client.storage
-    .from(BUCKET)
-    .upload(storagePath, bytes, { contentType: CONTENT_TYPE });
+  const upload = store.uploadChart(storagePath, bytes);
 
   if ((await untilCanceled(upload, signal)) === CANCELED) {
     /* The AI was never asked, so the Chart is all there is to undo. */
@@ -152,16 +136,14 @@ export async function analyzeChart(
   }
 
   onStep?.('reading');
-  const pending = client.functions.invoke('analyze-chart', {
-    body: { storage_path: storagePath },
-  });
+  const pending = store.invokeAnalysis(storagePath);
 
   if ((await untilCanceled(pending, signal)) === CANCELED) {
     /* The Edge Function runs to the end whatever the app does, and saves the
        Analysis on the way, so let it finish and then undo it. */
     void pending
       .then(
-        () => discardRun(client, storagePath),
+        () => store.deleteAnalysisPair({ storagePath }),
         /* It failed anyway, so there is no Analysis to undo. */
         () => discardChart(),
       )

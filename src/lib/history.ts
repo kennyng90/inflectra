@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import {
@@ -9,16 +8,12 @@ import {
   type Direction,
   type Trend,
 } from '@/lib/analysis-contract';
-import { supabase } from '@/lib/supabase';
-import { PermanentError, SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
-
-const BUCKET = 'charts';
-const TABLE = 'analyses';
-const LISTED_COLUMNS = 'id, asset_guess, storage_path, analysis, created_at';
-
-/* Long enough to browse History without re-signing, short enough that a leaked
-   URL goes stale quickly. Every visit to the tab signs fresh URLs. */
-const SIGNED_URL_TTL_SECONDS = 60 * 60;
+import {
+  createAnalysisStore,
+  type AnalysisStore,
+  type AnalysisStoreClient,
+} from '@/lib/analysis-store';
+import { PermanentError, UserFacingError } from '@/lib/user-facing-error';
 
 export const HISTORY_LOAD_ERROR =
   "We couldn't load your history. Check your connection and try again.";
@@ -79,17 +74,12 @@ export function toHistoryEntry(row: HistoryRecord): HistoryEntry | null {
 /* The Charts stay private: each thumbnail is fetched through a short-lived
    signed URL rather than a public one. */
 async function withThumbnails(
-  client: SupabaseClient,
+  store: AnalysisStore,
   entries: HistoryEntry[],
 ): Promise<HistoryEntry[]> {
   if (entries.length === 0) return entries;
 
-  const { data } = await client.storage
-    .from(BUCKET)
-    .createSignedUrls(
-      entries.map((entry) => entry.storagePath),
-      SIGNED_URL_TTL_SECONDS,
-    );
+  const { data } = await store.signCharts(entries.map((entry) => entry.storagePath));
   if (!data) return entries;
 
   const signed = new Map(data.filter((item) => item.path).map((item) => [item.path, item.signedUrl]));
@@ -101,21 +91,18 @@ async function withThumbnails(
 
 /* RLS scopes the rows to the signed-in user, so no filter is needed here. */
 export async function fetchHistory(
-  client: SupabaseClient | null = supabase,
+  client?: AnalysisStoreClient | null,
 ): Promise<HistoryEntry[]> {
-  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
+  const store = createAnalysisStore(client);
 
-  const { data, error } = await client
-    .from(TABLE)
-    .select(LISTED_COLUMNS)
-    .order('created_at', { ascending: false });
+  const { data, error } = await store.listAnalyses();
   if (error || !data) throw new UserFacingError(HISTORY_LOAD_ERROR);
 
   const entries = (data as HistoryRecord[])
     .map(toHistoryEntry)
     .filter((entry): entry is HistoryEntry => entry !== null);
 
-  return withThumbnails(client, entries);
+  return withThumbnails(store, entries);
 }
 
 /* One saved Analysis, read back whole so it can be re-read in hindsight next to
@@ -131,15 +118,11 @@ export type SavedAnalysis = {
 
 export async function fetchSavedAnalysis(
   id: string,
-  client: SupabaseClient | null = supabase,
+  client?: AnalysisStoreClient | null,
 ): Promise<SavedAnalysis> {
-  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
+  const store = createAnalysisStore(client);
 
-  const { data, error } = await client
-    .from(TABLE)
-    .select(LISTED_COLUMNS)
-    .eq('id', id)
-    .maybeSingle();
+  const { data, error } = await store.getAnalysis(id);
   if (error) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
   if (!data) throw new PermanentError(HISTORY_ENTRY_MISSING);
 
@@ -147,9 +130,7 @@ export async function fetchSavedAnalysis(
   const parsed = analysisSchema.safeParse(row.analysis);
   if (!parsed.success) throw new PermanentError(HISTORY_ENTRY_UNREADABLE);
 
-  const signed = await client.storage
-    .from(BUCKET)
-    .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+  const signed = await store.signChart(row.storage_path);
 
   return {
     id: row.id,
@@ -160,21 +141,16 @@ export async function fetchSavedAnalysis(
   };
 }
 
-/* The Chart image goes first: removing it is idempotent, so a delete that only
-   half-lands leaves the entry listed and a retry finishes the job. */
 export async function deleteHistoryEntry(
-  entry: { id: string; storagePath: string },
-  client: SupabaseClient | null = supabase,
+  id: string,
+  client?: AnalysisStoreClient | null,
 ): Promise<void> {
-  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
-
-  /* Removing nothing counts as done: that is what a retry of a half-finished
-     delete looks like, and it must be able to go on and drop the row. */
-  const { error: imageError } = await client.storage.from(BUCKET).remove([entry.storagePath]);
-  if (imageError) throw new UserFacingError(HISTORY_DELETE_ERROR);
-
-  const { error } = await client.from(TABLE).delete().eq('id', entry.id);
-  if (error) throw new UserFacingError(HISTORY_DELETE_ERROR);
+  const store = createAnalysisStore(client);
+  try {
+    await store.deleteAnalysisPair({ id });
+  } catch {
+    throw new UserFacingError(HISTORY_DELETE_ERROR);
+  }
 }
 
 const monthDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });

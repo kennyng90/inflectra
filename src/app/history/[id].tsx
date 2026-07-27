@@ -34,7 +34,7 @@ export default function SavedAnalysisScreen() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteHistoryEntry(saved);
+      await deleteHistoryEntry(saved.id);
       close();
     } catch (caught) {
       setDeleting(false);
