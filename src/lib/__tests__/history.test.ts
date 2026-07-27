@@ -4,6 +4,7 @@ import {
   HISTORY_DELETE_ERROR,
   HISTORY_ENTRY_LOAD_ERROR,
   HISTORY_ENTRY_MISSING,
+  HISTORY_ENTRY_UNREADABLE,
   HISTORY_LOAD_ERROR,
   deleteHistoryEntry,
   fetchHistory,
@@ -12,7 +13,7 @@ import {
   toHistoryEntry,
   type HistoryRecord,
 } from '../history';
-import { userFacingMessage } from '../user-facing-error';
+import { isPermanent, userFacingMessage } from '../user-facing-error';
 
 const analysis = {
   is_chart: true,
@@ -232,10 +233,24 @@ describe('fetchSavedAnalysis', () => {
     await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_MISSING);
   });
 
-  it('fails when the saved Analysis no longer reads', async () => {
+  it('says so plainly when the saved Analysis no longer reads', async () => {
     const { client } = fakeEntryClient({ data: row({ analysis: { trend: 'upwards' } }), error: null });
 
-    await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_LOAD_ERROR);
+    await expect(fetchSavedAnalysis('row-1', client)).rejects.toThrow(HISTORY_ENTRY_UNREADABLE);
+  });
+
+  it('marks what cannot be retried, and only that', async () => {
+    const gone = fakeEntryClient({ data: null, error: null });
+    const unreadable = fakeEntryClient({ data: row({ analysis: null }), error: null });
+    const offline = fakeEntryClient({ data: null, error: new Error('offline') });
+
+    expect(isPermanent(await fetchSavedAnalysis('row-1', gone.client).catch((e) => e))).toBe(true);
+    expect(isPermanent(await fetchSavedAnalysis('row-1', unreadable.client).catch((e) => e))).toBe(
+      true,
+    );
+    expect(isPermanent(await fetchSavedAnalysis('row-1', offline.client).catch((e) => e))).toBe(
+      false,
+    );
   });
 
   it('fails when the server connection is not set up', async () => {

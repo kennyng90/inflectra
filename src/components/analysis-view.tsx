@@ -66,6 +66,21 @@ function ChartStrip({
           backgroundColor: theme.colors.backgroundAlternate,
         }}
       />
+      {uri === null && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: theme.spacing.space20,
+            },
+          ]}>
+          <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak, textAlign: 'center' }}>
+            The chart didn&apos;t load, but the analysis of it is below.
+          </Text>
+        </View>
+      )}
       <View
         style={{
           position: 'absolute',
@@ -233,7 +248,6 @@ export function AnalysisView({
   /* Keyed by storage path for a saved Chart, whose signed URL changes every
      time it is opened and would otherwise re-download. */
   chartCacheKey,
-  /* Anything that belongs after the Analysis, inside the same scroll. */
   footer,
 }: {
   analysis: Analysis;

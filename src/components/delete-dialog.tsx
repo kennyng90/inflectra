@@ -5,31 +5,28 @@ import { ErrorNotice } from '@/components/error-notice';
 import { OverlayCard } from '@/components/overlay-card';
 import { useTheme } from '@/theme';
 
-type ConfirmDialogProps = {
+type DeleteDialogProps = {
   visible: boolean;
   title: string;
   body: string;
-  confirmLabel: string;
-  /* Set while the action runs, so it can't be started twice. */
   busy?: boolean;
-  /* Why the action didn't go through, shown without closing the dialog. */
+  /* Why the delete didn't go through, shown without closing the dialog. */
   error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-/* Asks before something destructive happens. Deliberately not a native alert:
+/* Asks before something is deleted for good. Deliberately not a native alert:
    the same dialog then shows on every platform, including web. */
-export function ConfirmDialog({
+export function DeleteDialog({
   visible,
   title,
   body,
-  confirmLabel,
   busy = false,
   error = null,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
+}: DeleteDialogProps) {
   const theme = useTheme();
 
   return (
@@ -62,7 +59,7 @@ export function ConfirmDialog({
           {error && <ErrorNotice message={error} />}
 
           <View style={{ gap: theme.spacing.space8, paddingTop: theme.spacing.space8 }}>
-            <Button label={confirmLabel} variant="danger" loading={busy} onPress={onConfirm} />
+            <Button label="Delete" variant="danger" loading={busy} onPress={onConfirm} />
             <Button label="Keep it" variant="secondary" disabled={busy} onPress={onCancel} />
           </View>
         </OverlayCard>

@@ -49,6 +49,7 @@ export function HistoryRow({ entry }: { entry: HistoryEntry }) {
       accessibilityRole="button"
       accessibilityLabel={`${entry.assetGuess}. ${direction}. ${trendCopy[entry.trend].label}. ${date}.`}
       accessibilityHint="Opens the full analysis"
+      /* Rows sit edge to edge, so any slop would reach into the neighbour. */
       hitSlop={0}
       onPress={() => router.push({ pathname: '/history/[id]', params: { id: entry.id } })}
       style={{

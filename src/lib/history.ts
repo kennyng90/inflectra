@@ -10,7 +10,7 @@ import {
   type Trend,
 } from '@/lib/analysis-contract';
 import { supabase } from '@/lib/supabase';
-import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
+import { PermanentError, SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
 
 const BUCKET = 'charts';
 const TABLE = 'analyses';
@@ -26,8 +26,12 @@ export const HISTORY_LOAD_ERROR =
 export const HISTORY_ENTRY_LOAD_ERROR =
   "We couldn't open this analysis. Check your connection and try again.";
 
-/* Nothing to retry: the row is gone, usually because it was deleted. */
 export const HISTORY_ENTRY_MISSING = "It was deleted, so there's nothing left to show.";
+
+/* The list reads a row loosely, so one the app can no longer parse in full
+   still gets this far. */
+export const HISTORY_ENTRY_UNREADABLE =
+  "It was saved by an older version of the app, so we can't show it anymore.";
 
 export const HISTORY_DELETE_ERROR =
   "We couldn't delete this analysis. Check your connection and try again.";
@@ -137,11 +141,11 @@ export async function fetchSavedAnalysis(
     .eq('id', id)
     .maybeSingle();
   if (error) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
-  if (!data) throw new UserFacingError(HISTORY_ENTRY_MISSING);
+  if (!data) throw new PermanentError(HISTORY_ENTRY_MISSING);
 
   const row = data as HistoryRecord;
   const parsed = analysisSchema.safeParse(row.analysis);
-  if (!parsed.success) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
+  if (!parsed.success) throw new PermanentError(HISTORY_ENTRY_UNREADABLE);
 
   const signed = await client.storage
     .from(BUCKET)
@@ -164,6 +168,8 @@ export async function deleteHistoryEntry(
 ): Promise<void> {
   if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
 
+  /* Removing nothing counts as done: that is what a retry of a half-finished
+     delete looks like, and it must be able to go on and drop the row. */
   const { error: imageError } = await client.storage.from(BUCKET).remove([entry.storagePath]);
   if (imageError) throw new UserFacingError(HISTORY_DELETE_ERROR);
 
