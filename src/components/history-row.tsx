@@ -7,7 +7,8 @@ import { OpacityPressable } from '@/components/opacity-pressable';
 import { TrendPill } from '@/components/pill';
 import type { Direction } from '@/lib/analysis-contract';
 import { directionCopy, trendCopy } from '@/lib/analysis-copy';
-import { formatHistoryDate, type HistoryEntry } from '@/lib/history';
+import type { HistoryEntry } from '@/lib/analysis-store';
+import { formatHistoryDate } from '@/lib/history-copy';
 import { useTheme, type Theme } from '@/theme';
 
 /* A chart-shaped thumbnail: wide enough to recognise the shape at a glance,

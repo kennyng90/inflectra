@@ -1,4 +1,5 @@
-import { HISTORY_LOAD_ERROR, fetchHistory, type HistoryEntry } from '@/lib/history';
+import { fetchHistory, type HistoryEntry } from '@/lib/analysis-store';
+import { HISTORY_LOAD_ERROR } from '@/lib/history-copy';
 import { useFocusedLoad } from '@/lib/use-focused-load';
 import { userFacingMessage } from '@/lib/user-facing-error';
 

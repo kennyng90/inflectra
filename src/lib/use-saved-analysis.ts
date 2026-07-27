@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 
-import { HISTORY_ENTRY_LOAD_ERROR, fetchSavedAnalysis, type SavedAnalysis } from '@/lib/history';
+import { fetchSavedAnalysis, type SavedAnalysis } from '@/lib/analysis-store';
+import { HISTORY_ENTRY_LOAD_ERROR } from '@/lib/history-copy';
 import { useFocusedLoad } from '@/lib/use-focused-load';
 import { isPermanent, userFacingMessage } from '@/lib/user-facing-error';
 

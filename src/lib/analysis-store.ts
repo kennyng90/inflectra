@@ -1,7 +1,27 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 
+import {
+  DIRECTIONS,
+  TRENDS,
+  analysisSchema,
+  type Analysis,
+  type Direction,
+  type Trend,
+} from '@/lib/analysis-contract';
+import {
+  HISTORY_DELETE_ERROR,
+  HISTORY_ENTRY_LOAD_ERROR,
+  HISTORY_ENTRY_MISSING,
+  HISTORY_ENTRY_UNREADABLE,
+  HISTORY_LOAD_ERROR,
+} from '@/lib/history-copy';
 import { supabase } from '@/lib/supabase';
-import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
+import {
+  PermanentError,
+  SERVER_UNCONFIGURED,
+  UserFacingError,
+} from '@/lib/user-facing-error';
 
 const CHART_BUCKET = 'charts';
 const ANALYSIS_TABLE = 'analyses';
@@ -9,6 +29,40 @@ const LISTED_COLUMNS = 'id, asset_guess, storage_path, analysis, created_at';
 /* Each History visit signs fresh URLs. This keeps leaked URLs short-lived. */
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const CHART_CONTENT_TYPE = 'image/jpeg';
+
+export type HistoryEntry = {
+  id: string;
+  assetGuess: string;
+  storagePath: string;
+  createdAt: string;
+  trend: Trend;
+  direction: Direction;
+  thumbnailUrl: string | null;
+};
+
+export type HistoryRecord = {
+  id: string;
+  asset_guess: string;
+  storage_path: string;
+  created_at: string;
+  analysis: unknown;
+};
+
+export type SavedAnalysis = {
+  id: string;
+  storagePath: string;
+  createdAt: string;
+  analysis: Analysis;
+  /* Null when the Chart couldn't be signed; the Analysis still opens. */
+  chartUrl: string | null;
+};
+
+/* Only what a row shows, read loosely so an Analysis saved under an older
+   contract still lists. */
+const listedAnalysisSchema = z.object({
+  trend: z.enum(TRENDS),
+  strategy: z.object({ direction: z.enum(DIRECTIONS) }),
+});
 
 export type AnalysisStoreClient = Pick<SupabaseClient, 'from' | 'functions' | 'storage'>;
 
@@ -95,3 +149,91 @@ export function createAnalysisStore(client: AnalysisStoreClient | null = supabas
 }
 
 export type AnalysisStore = ReturnType<typeof createAnalysisStore>;
+
+export function toHistoryEntry(row: HistoryRecord): HistoryEntry | null {
+  const parsed = listedAnalysisSchema.safeParse(row.analysis);
+  if (!parsed.success) return null;
+
+  return {
+    id: row.id,
+    assetGuess: row.asset_guess,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+    trend: parsed.data.trend,
+    direction: parsed.data.strategy.direction,
+    thumbnailUrl: null,
+  };
+}
+
+/* The Charts stay private: each thumbnail is fetched through a short-lived
+   signed URL rather than a public one. */
+async function withThumbnails(
+  store: AnalysisStore,
+  entries: HistoryEntry[],
+): Promise<HistoryEntry[]> {
+  if (entries.length === 0) return entries;
+
+  const { data } = await store.signCharts(entries.map((entry) => entry.storagePath));
+  if (!data) return entries;
+
+  const signed = new Map(data.filter((item) => item.path).map((item) => [item.path, item.signedUrl]));
+  return entries.map((entry) => ({
+    ...entry,
+    thumbnailUrl: signed.get(entry.storagePath) ?? null,
+  }));
+}
+
+/* RLS scopes the rows to the signed-in user, so no filter is needed here. */
+export async function fetchHistory(
+  client?: AnalysisStoreClient | null,
+): Promise<HistoryEntry[]> {
+  const store = createAnalysisStore(client);
+
+  const { data, error } = await store.listAnalyses();
+  if (error || !data) throw new UserFacingError(HISTORY_LOAD_ERROR);
+
+  const entries = (data as HistoryRecord[])
+    .map(toHistoryEntry)
+    .filter((entry): entry is HistoryEntry => entry !== null);
+
+  return withThumbnails(store, entries);
+}
+
+/* One saved Analysis, read back whole so it can be re-read in hindsight next to
+   the Chart it was based on. */
+export async function fetchSavedAnalysis(
+  id: string,
+  client?: AnalysisStoreClient | null,
+): Promise<SavedAnalysis> {
+  const store = createAnalysisStore(client);
+
+  const { data, error } = await store.getAnalysis(id);
+  if (error) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
+  if (!data) throw new PermanentError(HISTORY_ENTRY_MISSING);
+
+  const row = data as HistoryRecord;
+  const parsed = analysisSchema.safeParse(row.analysis);
+  if (!parsed.success) throw new PermanentError(HISTORY_ENTRY_UNREADABLE);
+
+  const signed = await store.signChart(row.storage_path);
+
+  return {
+    id: row.id,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+    analysis: parsed.data,
+    chartUrl: signed.data?.signedUrl ?? null,
+  };
+}
+
+export async function deleteHistoryEntry(
+  id: string,
+  client?: AnalysisStoreClient | null,
+): Promise<void> {
+  const store = createAnalysisStore(client);
+  try {
+    await store.deleteAnalysisPair({ id });
+  } catch {
+    throw new UserFacingError(HISTORY_DELETE_ERROR);
+  }
+}
