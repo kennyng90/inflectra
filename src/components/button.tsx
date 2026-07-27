@@ -10,7 +10,9 @@ export const BUTTON_HEIGHT = tokens.spacing.space12 * 2 + tokens.lineHeight.body
 type ButtonProps = {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
+  /* `danger` is the app's one destructive look: red on a red tint, quiet enough
+     that it never reads as the way forward. */
+  variant?: 'primary' | 'secondary' | 'danger';
   loading?: boolean;
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -32,12 +34,16 @@ export function Button({
     ? inactive
       ? theme.colors.fillDisabled
       : theme.colors.interactiveAction
-    : theme.colors.fillWeak;
+    : variant === 'danger'
+      ? theme.colors.fillErrorWeak
+      : theme.colors.fillWeak;
   const color = inactive
     ? theme.colors.textWeak
     : primary
       ? theme.colors.textInverseStrong
-      : theme.colors.textStrong;
+      : variant === 'danger'
+        ? theme.colors.textError
+        : theme.colors.textStrong;
 
   return (
     <OpacityPressable

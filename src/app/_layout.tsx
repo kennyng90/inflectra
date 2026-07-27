@@ -19,6 +19,7 @@ function RootStack() {
       <Stack.Protected guard={session !== null}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="analysis" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="history/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
       </Stack.Protected>
       <Stack.Screen name="sign-in" />

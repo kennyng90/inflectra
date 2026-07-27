@@ -1,7 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
-import { DIRECTIONS, TRENDS, type Direction, type Trend } from '@/lib/analysis-contract';
+import {
+  DIRECTIONS,
+  TRENDS,
+  analysisSchema,
+  type Analysis,
+  type Direction,
+  type Trend,
+} from '@/lib/analysis-contract';
 import { supabase } from '@/lib/supabase';
 import { SERVER_UNCONFIGURED, UserFacingError } from '@/lib/user-facing-error';
 
@@ -15,6 +22,15 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export const HISTORY_LOAD_ERROR =
   "We couldn't load your history. Check your connection and try again.";
+
+export const HISTORY_ENTRY_LOAD_ERROR =
+  "We couldn't open this analysis. Check your connection and try again.";
+
+/* Nothing to retry: the row is gone, usually because it was deleted. */
+export const HISTORY_ENTRY_MISSING = "It was deleted, so there's nothing left to show.";
+
+export const HISTORY_DELETE_ERROR =
+  "We couldn't delete this analysis. Check your connection and try again.";
 
 export type HistoryEntry = {
   id: string;
@@ -96,6 +112,63 @@ export async function fetchHistory(
     .filter((entry): entry is HistoryEntry => entry !== null);
 
   return withThumbnails(client, entries);
+}
+
+/* One saved Analysis, read back whole so it can be re-read in hindsight next to
+   the Chart it was based on. */
+export type SavedAnalysis = {
+  id: string;
+  storagePath: string;
+  createdAt: string;
+  analysis: Analysis;
+  /* Null when the Chart couldn't be signed; the Analysis still opens. */
+  chartUrl: string | null;
+};
+
+export async function fetchSavedAnalysis(
+  id: string,
+  client: SupabaseClient | null = supabase,
+): Promise<SavedAnalysis> {
+  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
+
+  const { data, error } = await client
+    .from(TABLE)
+    .select(LISTED_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
+  if (!data) throw new UserFacingError(HISTORY_ENTRY_MISSING);
+
+  const row = data as HistoryRecord;
+  const parsed = analysisSchema.safeParse(row.analysis);
+  if (!parsed.success) throw new UserFacingError(HISTORY_ENTRY_LOAD_ERROR);
+
+  const signed = await client.storage
+    .from(BUCKET)
+    .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+
+  return {
+    id: row.id,
+    storagePath: row.storage_path,
+    createdAt: row.created_at,
+    analysis: parsed.data,
+    chartUrl: signed.data?.signedUrl ?? null,
+  };
+}
+
+/* The Chart image goes first: removing it is idempotent, so a delete that only
+   half-lands leaves the entry listed and a retry finishes the job. */
+export async function deleteHistoryEntry(
+  entry: { id: string; storagePath: string },
+  client: SupabaseClient | null = supabase,
+): Promise<void> {
+  if (!client) throw new UserFacingError(SERVER_UNCONFIGURED);
+
+  const { error: imageError } = await client.storage.from(BUCKET).remove([entry.storagePath]);
+  if (imageError) throw new UserFacingError(HISTORY_DELETE_ERROR);
+
+  const { error } = await client.from(TABLE).delete().eq('id', entry.id);
+  if (error) throw new UserFacingError(HISTORY_DELETE_ERROR);
 }
 
 const monthDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
