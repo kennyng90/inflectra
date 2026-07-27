@@ -329,10 +329,13 @@ max_frequency = "5s"
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
 [auth.external.apple]
-enabled = false
-client_id = ""
-# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
-secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
+enabled = true
+# Native sign-in only, so the bundle ID is the sole audience Apple's identity
+# tokens carry. A web Services ID would have to go first in this list.
+client_id = "com.kenng90.inflectra"
+# Empty on purpose: the secret is only used by the web OAuth flow, which this
+# app doesn't use. Adding one would also start the 6-month rotation clock.
+secret = ""
 # Overrides the default auth callback URL derived from auth.external_url.
 redirect_uri = ""
 # Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,

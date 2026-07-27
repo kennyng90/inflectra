@@ -22,7 +22,12 @@ function RootStack() {
         <Stack.Screen name="history/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
       </Stack.Protected>
-      <Stack.Screen name="sign-in" />
+      {/* Guarded too, not just left open: a screen only redirects away when its
+          own guard flips to false, so an unguarded sign-in would keep showing
+          after the session arrives. */}
+      <Stack.Protected guard={session === null}>
+        <Stack.Screen name="sign-in" />
+      </Stack.Protected>
     </Stack>
   );
 }
