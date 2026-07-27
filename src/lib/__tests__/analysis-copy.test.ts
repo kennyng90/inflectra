@@ -1,6 +1,7 @@
 import type { Strategy } from '@/lib/analysis-contract';
 
 import {
+  ANALYZE_SIGN_IN_ERROR,
   buildLadder,
   directionCopy,
   formatDelta,
@@ -17,6 +18,12 @@ const strategy = (overrides: Partial<Strategy> = {}): Strategy => ({
   confidence: 0.7,
   rationale: 'The shape points up.',
   ...overrides,
+});
+
+describe('Analyze errors', () => {
+  it('tells a signed-out user how to recover', () => {
+    expect(ANALYZE_SIGN_IN_ERROR).toBe('Sign in again to analyze this chart.');
+  });
 });
 
 describe('formatPrice', () => {

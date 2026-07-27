@@ -2,6 +2,8 @@
    assumes zero trading knowledge; the trading term appears only as a hint. */
 import type { Direction, Strategy, Trend } from '@/lib/analysis-contract';
 
+export const ANALYZE_SIGN_IN_ERROR = 'Sign in again to analyze this chart.';
+
 /* Crypto prices run to many decimals, stock prices to two. */
 const priceFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 });
 

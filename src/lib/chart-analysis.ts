@@ -3,6 +3,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 
 import { analysisResultSchema, type AnalysisResult } from '@/lib/analysis-contract';
+import type { PickedChart } from '@/lib/analyze-flow-machine';
 import {
   createAnalysisStore,
   type AnalysisStoreClient,
@@ -30,7 +31,7 @@ export class CanceledError extends Error {
 export function isCanceled(error: unknown): boolean {
   return error instanceof CanceledError;
 }
-export type PickedChart = { uri: string; width: number; height: number };
+export type { PickedChart } from '@/lib/analyze-flow-machine';
 
 /* Dimensions to shrink to, or null when the Chart already fits. Only one edge
    is given so the manipulator preserves the aspect ratio. */
