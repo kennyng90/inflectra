@@ -1,6 +1,6 @@
 /* The Edge Function saves the History row itself, so the only honest test of a
    cancel drives analyzeChart against a fake client and checks what got undone. */
-import { analyzeChart, CanceledError, isCanceled } from '../chart-analysis';
+import { analyzeChart, CanceledError, isAnalysisCanceled } from '../chart-analysis';
 import type { AnalyzeStep } from '../analyzing-copy';
 import type { AnalysisStoreClient } from '../analysis-store';
 
@@ -162,12 +162,12 @@ describe('analyzeChart cancellation', () => {
   });
 });
 
-describe('isCanceled', () => {
+describe('isAnalysisCanceled', () => {
   it('recognises a canceled run', () => {
-    expect(isCanceled(new CanceledError())).toBe(true);
+    expect(isAnalysisCanceled(new CanceledError())).toBe(true);
   });
 
   it('leaves real failures alone', () => {
-    expect(isCanceled(new Error('Failed to fetch'))).toBe(false);
+    expect(isAnalysisCanceled(new Error('Failed to fetch'))).toBe(false);
   });
 });

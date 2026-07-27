@@ -11,7 +11,7 @@ const CANCELED_CODE = 'ERR_REQUEST_CANCELED';
 
 export type AppleSignInOutcome = 'signed-in' | 'canceled';
 
-export function isCanceled(error: unknown): boolean {
+export function isAppleSignInCanceled(error: unknown): boolean {
   return (
     typeof error === 'object' &&
     error !== null &&
@@ -67,7 +67,7 @@ export async function signInWithApple(): Promise<AppleSignInOutcome> {
       ],
     });
   } catch (error) {
-    if (isCanceled(error)) return 'canceled';
+    if (isAppleSignInCanceled(error)) return 'canceled';
     throw error;
   }
 

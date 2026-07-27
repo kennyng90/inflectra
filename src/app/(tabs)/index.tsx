@@ -24,14 +24,12 @@ export default function AnalyzeScreen() {
      already covers the floating tab bar. Only scroll views get it for free. */
   const insets = useSafeAreaInsets();
   const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
-  const [pickError, setPickError] = useState<string | null>(null);
   const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
 
   const analyzing = phase === 'analyzing';
   const rejected = phase === 'rejected';
   const failed = phase === 'failed';
   const cameraOff = captureNote?.status === 'blocked';
-  const errorMessage = pickError ?? error;
   const note = captureNote?.message;
   /* A rejected Chart can't be analyzed again, and a camera that's off can't
      take one, so whichever action can still move the user on leads. */
@@ -49,7 +47,6 @@ export default function AnalyzeScreen() {
   };
 
   const analyze = async () => {
-    setPickError(null);
     /* Whatever the analysis has to say outranks a stale capture note. */
     setCaptureNote(null);
     if (await submit()) router.push('/analysis');
@@ -118,7 +115,7 @@ export default function AnalyzeScreen() {
           />
         ) : (
           <>
-            {(errorMessage || note) && (
+            {(error || note) && (
               <Text
                 accessibilityRole="alert"
                 style={{
@@ -126,7 +123,7 @@ export default function AnalyzeScreen() {
                   color: theme.colors.textError,
                   textAlign: 'center',
                 }}>
-                {errorMessage || note}
+                {error || note}
               </Text>
             )}
 

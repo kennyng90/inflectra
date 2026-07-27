@@ -1,4 +1,4 @@
-import { fullNameFrom, isCanceled } from '@/lib/apple-auth';
+import { fullNameFrom, isAppleSignInCanceled } from '@/lib/apple-auth';
 
 const emptyName = {
   namePrefix: null,
@@ -28,14 +28,14 @@ describe('fullNameFrom', () => {
   });
 });
 
-describe('isCanceled', () => {
+describe('isAppleSignInCanceled', () => {
   it('recognizes the dismissal Apple throws', () => {
-    expect(isCanceled({ code: 'ERR_REQUEST_CANCELED' })).toBe(true);
+    expect(isAppleSignInCanceled({ code: 'ERR_REQUEST_CANCELED' })).toBe(true);
   });
 
   it('leaves real failures alone', () => {
-    expect(isCanceled({ code: 'ERR_REQUEST_FAILED' })).toBe(false);
-    expect(isCanceled(new Error('offline'))).toBe(false);
-    expect(isCanceled(null)).toBe(false);
+    expect(isAppleSignInCanceled({ code: 'ERR_REQUEST_FAILED' })).toBe(false);
+    expect(isAppleSignInCanceled(new Error('offline'))).toBe(false);
+    expect(isAppleSignInCanceled(null)).toBe(false);
   });
 });

@@ -28,14 +28,14 @@ export class CanceledError extends Error {
   }
 }
 
-export function isCanceled(error: unknown): boolean {
+export function isAnalysisCanceled(error: unknown): boolean {
   return error instanceof CanceledError;
 }
 export type { PickedChart } from '@/lib/analyze-flow-machine';
 
 /* Dimensions to shrink to, or null when the Chart already fits. Only one edge
    is given so the manipulator preserves the aspect ratio. */
-export function resizeTarget(
+function resizeTarget(
   width: number,
   height: number,
 ): { width: number } | { height: number } | null {
@@ -46,7 +46,7 @@ export function resizeTarget(
 
 /* The Edge Function answers failures with { error: { code, message } }, and
    supabase-js hands that response back on the error's `context`. */
-export async function serverErrorMessage(error: unknown): Promise<string> {
+async function serverErrorMessage(error: unknown): Promise<string> {
   const context = (error as { context?: { json?: () => Promise<unknown> } } | null)?.context;
   if (typeof context?.json !== 'function') return GENERIC_ANALYZE_ERROR;
   const body = (await context.json().catch(() => null)) as {

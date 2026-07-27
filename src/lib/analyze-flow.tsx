@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth';
 import {
   analyzeChart,
   GENERIC_ANALYZE_ERROR,
-  isCanceled,
+  isAnalysisCanceled,
 } from '@/lib/chart-analysis';
 import { userFacingMessage } from '@/lib/user-facing-error';
 
@@ -74,7 +74,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'complete', analysis: result, chartUri: chart.uri });
       return true;
     } catch (error) {
-      if (isCanceled(error)) {
+      if (isAnalysisCanceled(error)) {
         dispatch({ type: 'cancel' });
         return false;
       }
