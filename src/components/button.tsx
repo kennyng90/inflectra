@@ -1,4 +1,6 @@
-import { ActivityIndicator, Text } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import type { SFSymbol } from 'expo-symbols';
+import { ActivityIndicator, Platform, Text } from 'react-native';
 
 import { OpacityPressable } from '@/components/opacity-pressable';
 import { lightTheme as tokens, useTheme, type Theme } from '@/theme';
@@ -15,6 +17,10 @@ type ButtonProps = {
   label: string;
   onPress: () => void;
   variant?: Variant;
+  /* SF Symbol, with a glyph standing in off iOS. Decoration only - the label
+     already says what the button does, so it stays out of the a11y tree. */
+  icon?: SFSymbol;
+  iconFallback?: string;
   loading?: boolean;
   disabled?: boolean;
   accessibilityLabel?: string;
@@ -33,6 +39,8 @@ export function Button({
   label,
   onPress,
   variant = 'primary',
+  icon,
+  iconFallback,
   loading = false,
   disabled = false,
   accessibilityLabel,
@@ -40,6 +48,7 @@ export function Button({
   const theme = useTheme();
   const inactive = disabled || loading;
   const colors = variantColors[variant](theme);
+  const iconSize = theme.spacing.space20;
 
   /* Only the filled button greys out; the quiet ones just lose their label. */
   const backgroundColor =
@@ -63,7 +72,14 @@ export function Button({
         justifyContent: 'center',
         gap: theme.spacing.space8,
       }}>
-      {loading && <ActivityIndicator size="small" color={color} />}
+      {/* The spinner takes the icon's place, so the label never shifts. */}
+      {loading ? (
+        <ActivityIndicator size="small" color={color} />
+      ) : icon && Platform.OS === 'ios' ? (
+        <SymbolView name={icon} size={iconSize} weight="semibold" tintColor={color} />
+      ) : icon && iconFallback ? (
+        <Text style={{ fontSize: iconSize, lineHeight: iconSize, color }}>{iconFallback}</Text>
+      ) : null}
       <Text style={{ ...theme.text.body, fontWeight: theme.fontWeight.strong, color }}>
         {label}
       </Text>

@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button, BUTTON_HEIGHT } from '@/components/button';
@@ -20,6 +20,9 @@ type CaptureNote = Extract<CaptureOutcome, { message: string }>;
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
+  /* Native tabs give each screen its own SafeAreaProvider, so this bottom inset
+     already covers the floating tab bar. Only scroll views get it for free. */
+  const insets = useSafeAreaInsets();
   const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
   const [pickError, setPickError] = useState<string | null>(null);
   const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
@@ -100,13 +103,19 @@ export default function AnalyzeScreen() {
       <View
         style={{
           padding: theme.spacing.space20,
-          paddingBottom: theme.spacing.space24,
+          paddingBottom: insets.bottom + theme.spacing.space32,
           gap: theme.spacing.space12,
           justifyContent: 'flex-end',
           ...(chart === null ? {} : { minHeight: actionsMinHeight }),
         }}>
         {analyzing ? (
-          <Button label="Cancel" variant="secondary" onPress={cancel} />
+          <Button
+            label="Cancel"
+            variant="secondary"
+            icon="xmark"
+            iconFallback="✕"
+            onPress={cancel}
+          />
         ) : (
           <>
             {(errorMessage || note) && (
@@ -126,6 +135,8 @@ export default function AnalyzeScreen() {
             {lead === 'analyze' && (
               <Button
                 label={failed ? 'Try again' : 'Analyze this chart'}
+                icon={failed ? 'arrow.clockwise' : 'sparkles'}
+                iconFallback={failed ? '↻' : '✨'}
                 disabled={analyzing}
                 onPress={analyze}
               />
@@ -134,19 +145,29 @@ export default function AnalyzeScreen() {
             <Button
               label="Take a photo"
               variant={lead === 'camera' ? 'primary' : 'secondary'}
+              icon="camera"
+              iconFallback="📷"
               disabled={analyzing}
               onPress={() => capture(takeChartPhoto)}
             />
             <Button
               label="Choose from photos"
               variant={lead === 'library' ? 'primary' : 'secondary'}
+              icon="photo.on.rectangle"
+              iconFallback="🖼"
               disabled={analyzing}
               onPress={() => capture(chooseChartFromLibrary)}
             />
 
             {/* Last in the stack: a repair step, not the way forward. */}
             {cameraOff && !analyzing && (
-              <Button label="Open Settings" variant="secondary" onPress={openSettings} />
+              <Button
+                label="Open Settings"
+                variant="secondary"
+                icon="gearshape"
+                iconFallback="⚙︎"
+                onPress={openSettings}
+              />
             )}
           </>
         )}

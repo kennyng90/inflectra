@@ -1,5 +1,5 @@
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
@@ -25,6 +25,9 @@ function Separator() {
 
 export default function HistoryScreen() {
   const theme = useTheme();
+  /* The list clears the floating tab bar on its own (iOS adjusts the first
+     scroll view's insets); the retry block below is a plain view and doesn't. */
+  const insets = useSafeAreaInsets();
   const { entries, error, refreshing, refresh, retry } = useHistory();
 
   const renderBody = () => {
@@ -40,8 +43,12 @@ export default function HistoryScreen() {
       return (
         <>
           <EmptyState heading="History didn't load" body={error ?? ''} />
-          <View style={{ padding: theme.spacing.space20, paddingBottom: theme.spacing.space24 }}>
-            <Button label="Try again" onPress={retry} />
+          <View
+            style={{
+              padding: theme.spacing.space20,
+              paddingBottom: insets.bottom + theme.spacing.space32,
+            }}>
+            <Button label="Try again" icon="arrow.clockwise" iconFallback="↻" onPress={retry} />
           </View>
         </>
       );
