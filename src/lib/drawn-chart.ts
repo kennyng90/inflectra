@@ -130,7 +130,7 @@ const MAX_PRICE_DECIMALS = 4;
    ticks rather than from how big the numbers are: a stable Instrument's whole
    range can sit inside an øre, where a krone-precise label repeats itself five
    times and the axis stops being something a level can be checked against. */
-function priceDecimals(highest: number, span: number): number {
+function priceAxisDecimals(highest: number, span: number): number {
   const gap = span / (PRICE_TICK_COUNT - 1);
   /* A market that never moved has no gap to resolve, only a size. */
   if (gap <= 0) return highest >= 1000 ? 0 : 2;
@@ -169,9 +169,10 @@ function dated(at: Date): string {
 function formatDays(from: number, to: number): string {
   const start = new Date(from);
   const end = new Date(to);
-  if (dated(start) === dated(end)) return dated(end);
-  const sameYear = start.getFullYear() === end.getFullYear();
-  return `${sameYear ? day(start) : dated(start)} – ${dated(end)}`;
+  const lastDay = dated(end);
+  if (dated(start) === lastDay) return lastDay;
+  if (start.getFullYear() === end.getFullYear()) return `${day(start)} – ${lastDay}`;
+  return `${dated(start)} – ${lastDay}`;
 }
 
 /* Evenly spaced positions across `count` items, ends included. */
@@ -221,7 +222,7 @@ function layout(
     };
   });
 
-  const decimals = priceDecimals(highest, span);
+  const decimals = priceAxisDecimals(highest, span);
   const priceTicks = Array.from({ length: PRICE_TICK_COUNT }, (_, index) => {
     const price = highest - (span * index) / (PRICE_TICK_COUNT - 1);
     const amount = formatPrice(price, decimals);

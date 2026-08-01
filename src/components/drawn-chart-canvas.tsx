@@ -8,6 +8,14 @@ const HAIRLINE = 1;
 /* A wick is a fraction of its candle's width, and never thinner than a line. */
 const WICK_WIDTH_RATIO = 0.16;
 
+/* The dates at the ends are anchored inwards, so the first and last never hang
+   off the drawing. */
+function timeAnchor(index: number, count: number): 'start' | 'middle' | 'end' {
+  if (index === 0) return 'start';
+  if (index === count - 1) return 'end';
+  return 'middle';
+}
+
 /* Draws what `drawn-chart` worked out. Every number here is either geometry
    from that module or a value from the theme, so the Chart reads as part of the
    app and this stays a pure picture of the data: no fetching, no maths, nothing
@@ -22,7 +30,7 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
   const { plot, size } = chart;
   const height = (width * size.height) / size.width;
   const font = theme.fontFamily.sans;
-  const axisSize = theme.fontSize.tiny;
+  const axisLabelSize = theme.fontSize.tiny;
 
   return (
     <Svg width={width} height={height} viewBox={`0 0 ${size.width} ${size.height}`}>
@@ -63,7 +71,7 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
             x={plot.x + plot.width + theme.spacing.space8}
             y={tick.y + theme.spacing.space4}
             fontFamily={font}
-            fontSize={axisSize}
+            fontSize={axisLabelSize}
             fill={theme.colors.textWeak}>
             {tick.label}
           </SvgText>
@@ -93,18 +101,15 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
         );
       })}
 
-      {/* Dates hang below the plot floor. The ends are anchored inwards, so the
-          first and last never hang off the drawing. */}
+      {/* Dates hang below the plot floor. */}
       {chart.timeTicks.map((tick, index) => (
         <SvgText
           key={`time-${index}`}
           x={tick.x}
           y={plot.y + plot.height + theme.spacing.space24}
-          textAnchor={
-            index === 0 ? 'start' : index === chart.timeTicks.length - 1 ? 'end' : 'middle'
-          }
+          textAnchor={timeAnchor(index, chart.timeTicks.length)}
           fontFamily={font}
-          fontSize={axisSize}
+          fontSize={axisLabelSize}
           fill={theme.colors.textWeak}>
           {tick.label}
         </SvgText>

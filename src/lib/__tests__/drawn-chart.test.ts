@@ -19,12 +19,12 @@ const FOUR_HOURS = 8 * HALF_HOUR;
 const FIRST_CANDLE = new Date(2026, 6, 20, 6).getTime();
 
 /* A gentle zig-zag, so highs and lows land on known candles. */
-function candles(count = MIN_CANDLES + 10, step = HALF_HOUR): Ohlc[] {
+function candles(count = MIN_CANDLES + 10, step = HALF_HOUR, from = FIRST_CANDLE): Ohlc[] {
   return Array.from({ length: count }, (_, index) => {
     const open = 100 + (index % 5) * 2;
     const close = index % 2 === 0 ? open + 1 : open - 1;
     return [
-      FIRST_CANDLE + index * step,
+      from + index * step,
       open,
       Math.max(open, close) + 1,
       Math.min(open, close) - 1,
@@ -218,7 +218,7 @@ describe('buildDrawnChart', () => {
 
     expect(new Set(labels).size).toBe(labels.length);
     /* And one precision down the whole column, not one per number. */
-    const decimals = labels.map((label) => (label.split(',')[1] ?? '').replace(' kr', '').length);
+    const decimals = labels.map((label) => label.replace(' kr', '').split(',')[1]?.length ?? 0);
     expect(new Set(decimals).size).toBe(1);
   });
 
@@ -233,6 +233,19 @@ describe('buildDrawnChart', () => {
     expect(drawn.subtitle).toContain(dayOf(rows[0][0]));
     expect(drawn.subtitle).toContain(datedOf(rows[rows.length - 1][0]));
     expect(drawn.subtitle).toMatch(/four-hour steps$/);
+  });
+
+  /* A month of trading can start in one year and end in the next, and then the
+     first date needs a year of its own to be read at all. */
+  it('gives both ends a year when the Chart crosses one', async () => {
+    const lateDecember = new Date(2025, 11, 29, 6).getTime();
+    const rows = candles(MIN_CANDLES + 10, FOUR_HOURS, lateDecember);
+
+    const drawn = await buildDrawnChart(PICK, stubFetch(rows));
+
+    expect(drawn.subtitle).toBe(
+      `${datedOf(rows[0][0])} – ${datedOf(rows[rows.length - 1][0])}, in four-hour steps`,
+    );
   });
 
   it('says one day once when every candle is from that day', async () => {
