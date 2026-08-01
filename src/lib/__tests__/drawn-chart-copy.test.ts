@@ -7,6 +7,7 @@ import {
   MARKET_DATA_UNREADABLE,
   MARKET_PRICE_NOTE,
   NOT_ENOUGH_MARKET_DATA,
+  PICK_TIME_RESOLUTION_TITLE,
   TIME_RESOLUTION_COPY,
   drawnChartSubtitle,
   drawnChartTitle,
@@ -27,6 +28,22 @@ describe('TIME_RESOLUTION_COPY', () => {
     /* One day, because two is not a range the price data comes in. */
     expect(TIME_RESOLUTION_COPY.two_days.detail).toMatch(/one day/i);
     expect(TIME_RESOLUTION_COPY.thirty_days.detail).toMatch(/month/i);
+  });
+
+  /* Choices side by side are only a choice if they read differently. */
+  it('gives each one its own words', () => {
+    const copies = TIME_RESOLUTIONS.map((resolution) => TIME_RESOLUTION_COPY[resolution]);
+    expect(new Set(copies.map((copy) => copy.label)).size).toBe(copies.length);
+    expect(new Set(copies.map((copy) => copy.detail)).size).toBe(copies.length);
+  });
+});
+
+describe('PICK_TIME_RESOLUTION_TITLE', () => {
+  it('asks how far back the Chart reaches, in words a first-timer knows', () => {
+    expect(PICK_TIME_RESOLUTION_TITLE).toMatch(/how far back/i);
+    expect(PICK_TIME_RESOLUTION_TITLE).not.toMatch(
+      /interval|timeframe|granular|period|candle|resolution/i,
+    );
   });
 });
 

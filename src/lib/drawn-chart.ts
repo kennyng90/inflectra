@@ -21,10 +21,6 @@ import { spacing } from '@/theme/tokens';
 
 export type DrawnChartPick = { instrument: string; timeResolution: TimeResolution };
 
-/* The Time resolution every drawn Chart is made at until picking one gets its
-   own ticket. Nothing here reads it: a pick carries its own. */
-export const DEFAULT_TIME_RESOLUTION: TimeResolution = 'thirty_days';
-
 /* CoinGecko has no granularity parameter: the range asked for picks it. What it
    does have is a closed list of ranges - 1, 7, 14, 30, 90, 180, 365 - and no key
    buys past it. `days=2` is answered "Invalid days parameter" (measured

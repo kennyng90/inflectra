@@ -7,15 +7,14 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button, BUTTON_HEIGHT } from '@/components/button';
 import { ChartOverlay } from '@/components/chart-overlay';
+import { DrawnChartPicker } from '@/components/drawn-chart-picker';
 import { EmptyState } from '@/components/empty-state';
-import { InstrumentPicker } from '@/components/instrument-picker';
 import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
-import { DEFAULT_TIME_RESOLUTION } from '@/lib/drawn-chart';
+import type { DrawnChartPick } from '@/lib/drawn-chart';
 import { useDrawnChartCapture } from '@/lib/drawn-chart-capture';
-import type { Instrument } from '@/lib/instruments';
 import { useTheme } from '@/theme';
 
 /* What a failed attempt to source a Chart left behind. */
@@ -58,11 +57,8 @@ export default function AnalyzeScreen() {
     else setCaptureNote(outcome);
   };
 
-  /* The Instrument is the user's; the Time resolution becomes theirs next. */
-  const draw = (instrument: Instrument) =>
-    capture(() =>
-      drawChart({ instrument: instrument.symbol, timeResolution: DEFAULT_TIME_RESOLUTION }),
-    );
+  /* Both halves of the pick are the user's; the screen only carries it. */
+  const draw = (pick: DrawnChartPick) => capture(() => drawChart(pick));
 
   const analyze = async () => {
     /* Whatever the analysis has to say outranks a stale capture note. */
@@ -173,7 +169,7 @@ export default function AnalyzeScreen() {
               disabled={sourcingBlocked}
               onPress={() => capture(chooseChartFromLibrary)}
             />
-            <InstrumentPicker busy={drawing} disabled={sourcingBlocked} onPick={draw} />
+            <DrawnChartPicker busy={drawing} disabled={sourcingBlocked} onPick={draw} />
 
             {/* Last in the stack: a repair step, not the way forward. */}
             {cameraOff && !analyzing && (

@@ -25,6 +25,11 @@ export const DRAWN_CHART_UNREADABLE = "We couldn't draw a readable chart this ti
 export const MARKET_PRICE_NOTE =
   'Prices here follow the wider market, so they can differ a little from your exchange.';
 
+/* Heads the two Time resolutions where they are offered. The question is what
+   the user is actually deciding; how coarse the steps come out is the price
+   data's answer to it, not theirs, so that is left to the detail on each one. */
+export const PICK_TIME_RESOLUTION_TITLE = 'How far back?';
+
 export type TimeResolutionCopy = {
   /* What the choice is called. */
   label: string;
