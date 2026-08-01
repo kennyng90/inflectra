@@ -18,8 +18,9 @@ import { UserFacingError } from '@/lib/user-facing-error';
 export type FetchLike = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
 
 export type Instrument = {
-  /* What goes on the Analysis row and on the Chart's axis label. */
+  /* Written onto the Analysis row as the Chart's origin. */
   symbol: string;
+  /* What the Chart's title calls it. */
   name: string;
   coinGeckoId: string;
 };
@@ -101,28 +102,35 @@ function instrumentFor(symbol: string): Instrument {
   return instrument;
 }
 
-function ohlcUrl(pick: DrawnChartPick): string {
-  const { coinGeckoId } = instrumentFor(pick.instrument);
-  const days = DAYS_FOR[pick.timeResolution];
-  return `${OHLC_ENDPOINT}/${coinGeckoId}/ohlc?vs_currency=${QUOTE_CURRENCY}&days=${days}`;
+function ohlcUrl(instrument: Instrument, timeResolution: TimeResolution): string {
+  const days = DAYS_FOR[timeResolution];
+  return `${OHLC_ENDPOINT}/${instrument.coinGeckoId}/ohlc?vs_currency=${QUOTE_CURRENCY}&days=${days}`;
+}
+
+/* One candle per row: [openTimeMs, open, high, low, close]. Later columns, if
+   CoinGecko ever adds any, are not read. */
+function isOhlcRow(row: unknown): row is [number, number, number, number, number] {
+  return (
+    Array.isArray(row) && row.length >= 5 && row.slice(0, 5).every((value) => Number.isFinite(value))
+  );
 }
 
 function toCandles(payload: unknown): Candle[] {
   if (!Array.isArray(payload)) throw new UserFacingError(MARKET_DATA_UNREADABLE);
 
   return payload.map((row) => {
-    if (!Array.isArray(row) || row.length < 5 || row.slice(0, 5).some((n) => !Number.isFinite(n))) {
-      throw new UserFacingError(MARKET_DATA_UNREADABLE);
-    }
-    const [time, open, high, low, close] = row as number[];
+    if (!isOhlcRow(row)) throw new UserFacingError(MARKET_DATA_UNREADABLE);
+    const [time, open, high, low, close] = row;
     return { time, open, high, low, close };
   });
 }
 
-async function fetchCandles(pick: DrawnChartPick, fetchImpl: FetchLike): Promise<Candle[]> {
+/* Takes the URL already built, so resolving the Instrument - a bug when it
+   fails, not a network fault - stays outside the reach of the catch below. */
+async function fetchCandles(url: string, fetchImpl: FetchLike): Promise<Candle[]> {
   let response: Awaited<ReturnType<FetchLike>>;
   try {
-    response = await fetchImpl(ohlcUrl(pick));
+    response = await fetchImpl(url);
   } catch {
     throw new UserFacingError(MARKET_DATA_UNREACHABLE);
   }
@@ -137,11 +145,16 @@ async function fetchCandles(pick: DrawnChartPick, fetchImpl: FetchLike): Promise
   return candles;
 }
 
-/* Norwegian numbers: space between thousands, comma before decimals. Coarser as
-   the price grows, so a label never runs into the one beside it. */
+/* Coarser as the price grows, so a label never runs into the one beside it. */
+function priceDecimals(price: number): number {
+  if (price >= 1000) return 0;
+  if (price >= 10) return 1;
+  return 4;
+}
+
+/* Norwegian numbers: space between thousands, comma before decimals. */
 function formatPrice(price: number): string {
-  const decimals = price >= 1000 ? 0 : price >= 10 ? 1 : 4;
-  const [whole, fraction] = price.toFixed(decimals).split('.');
+  const [whole, fraction] = price.toFixed(priceDecimals(price)).split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return fraction ? `${grouped},${fraction}` : grouped;
 }
@@ -166,7 +179,11 @@ function spread(count: number, steps: number): number[] {
   );
 }
 
-function layout(candles: Candle[], pick: DrawnChartPick): Omit<DrawnChart, 'origin'> {
+function layout(
+  candles: Candle[],
+  instrument: Instrument,
+  timeResolution: TimeResolution,
+): Omit<DrawnChart, 'origin'> {
   const plot = {
     x: PADDING.left,
     y: PADDING.top,
@@ -206,13 +223,13 @@ function layout(candles: Candle[], pick: DrawnChartPick): Omit<DrawnChart, 'orig
   });
 
   const timeTicks = spread(candles.length, TIME_TICK_COUNT).map((index) => ({
-    label: formatTime(candles[index].time, pick.timeResolution),
+    label: formatTime(candles[index].time, timeResolution),
     x: drawn[index].x,
   }));
 
   return {
-    title: drawnChartTitle(instrumentFor(pick.instrument).name),
-    subtitle: TIME_RESOLUTION_COPY[pick.timeResolution].onChart,
+    title: drawnChartTitle(instrument.name),
+    subtitle: TIME_RESOLUTION_COPY[timeResolution].onChart,
     size: { width: DRAWING_WIDTH, height: DRAWING_HEIGHT },
     plot,
     candles: drawn,
@@ -227,9 +244,10 @@ export async function buildDrawnChart(
   pick: DrawnChartPick,
   fetchImpl: FetchLike = fetch,
 ): Promise<DrawnChart> {
-  const candles = await fetchCandles(pick, fetchImpl);
+  const instrument = instrumentFor(pick.instrument);
+  const candles = await fetchCandles(ohlcUrl(instrument, pick.timeResolution), fetchImpl);
   return {
     origin: { instrument: pick.instrument, time_resolution: pick.timeResolution },
-    ...layout(candles, pick),
+    ...layout(candles, instrument, pick.timeResolution),
   };
 }

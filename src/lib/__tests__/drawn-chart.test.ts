@@ -12,6 +12,7 @@ import {
   MARKET_DATA_UNREADABLE,
   NOT_ENOUGH_MARKET_DATA,
 } from '../drawn-chart-copy';
+import { UserFacingError } from '../user-facing-error';
 
 /* CoinGecko answers [openTimeMs, open, high, low, close]. */
 type Ohlc = [number, number, number, number, number];
@@ -78,9 +79,7 @@ describe('buildDrawnChart', () => {
   });
 
   it('reads a rising candle as rising and a falling one as falling', async () => {
-    const rows: Ohlc[] = candles();
-
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(rows));
+    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles()));
 
     expect(drawn.candles.map((candle) => candle.rising).slice(0, 4)).toEqual([
       true,
@@ -197,5 +196,19 @@ describe('buildDrawnChart', () => {
     await expect(
       buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles(MIN_CANDLES - 1))),
     ).rejects.toThrow(NOT_ENOUGH_MARKET_DATA);
+  });
+
+  /* The list is the only way to ask for an Instrument, so one off it is our own
+     mistake and must not reach the user dressed as a failure they can retry. */
+  it('fails on an Instrument that is not on the list without asking CoinGecko', async () => {
+    const fetchImpl = stubFetch(candles());
+
+    const error = await buildDrawnChart(
+      { instrument: 'DOGE', timeResolution: 'two_days' },
+      fetchImpl,
+    ).catch((caught) => caught);
+
+    expect(error).not.toBeInstanceOf(UserFacingError);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

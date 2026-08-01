@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
 import { useDrawnChartCapture } from '@/lib/drawn-chart-capture';
-import { DRAW_CHART_ACTION } from '@/lib/drawn-chart-copy';
+import { DRAWING_CHART_ACTION, DRAW_CHART_ACTION } from '@/lib/drawn-chart-copy';
 import { useTheme } from '@/theme';
 
 /* What a failed attempt to source a Chart left behind. */
@@ -36,6 +36,8 @@ export default function AnalyzeScreen() {
   const failed = phase === 'failed';
   const cameraOff = captureNote?.status === 'blocked';
   const note = captureNote?.message;
+  /* One Chart at a time: whichever way in is already busy closes all three. */
+  const sourcingBlocked = analyzing || drawing;
   /* A rejected Chart can't be analyzed again, and a camera that's off can't
      take one, so whichever action can still move the user on leads. */
   const lead = chart !== null && !rejected ? 'analyze' : cameraOff ? 'library' : 'camera';
@@ -149,7 +151,7 @@ export default function AnalyzeScreen() {
               variant={lead === 'camera' ? 'primary' : 'secondary'}
               icon="camera"
               iconFallback="📷"
-              disabled={analyzing || drawing}
+              disabled={sourcingBlocked}
               onPress={() => capture(takeChartPhoto)}
             />
             <Button
@@ -157,15 +159,15 @@ export default function AnalyzeScreen() {
               variant={lead === 'library' ? 'primary' : 'secondary'}
               icon="photo.on.rectangle"
               iconFallback="🖼"
-              disabled={analyzing || drawing}
+              disabled={sourcingBlocked}
               onPress={() => capture(chooseChartFromLibrary)}
             />
             <Button
-              label={drawing ? 'Drawing a chart…' : DRAW_CHART_ACTION}
+              label={drawing ? DRAWING_CHART_ACTION : DRAW_CHART_ACTION}
               variant="secondary"
               icon="chart.xyaxis.line"
               iconFallback="📈"
-              disabled={analyzing || drawing}
+              disabled={sourcingBlocked}
               onPress={() => capture(drawChart)}
             />
 

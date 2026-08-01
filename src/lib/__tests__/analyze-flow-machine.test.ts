@@ -61,7 +61,7 @@ describe('analyzeFlowReducer', () => {
     });
   });
 
-  it('carries a drawn Chart\'s origin through pick', () => {
+  it("carries a drawn Chart's origin through pick", () => {
     const drawn: PickedChart = {
       ...chart,
       origin: { instrument: 'BTC', time_resolution: 'two_days' },

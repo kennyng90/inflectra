@@ -4,6 +4,8 @@
 import type { TimeResolution } from '@/lib/chart-origin';
 
 export const DRAW_CHART_ACTION = 'Draw a chart for me';
+/* The same button while the drawing is being made. */
+export const DRAWING_CHART_ACTION = 'Drawing a chart…';
 
 export const MARKET_DATA_UNREACHABLE =
   "We couldn't reach the price data. Check your connection and try again.";
