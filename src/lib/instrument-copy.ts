@@ -7,6 +7,8 @@ export const PICK_INSTRUMENT_DISMISS = 'Not now';
 export const INSTRUMENT_LIST_LOADING = 'Loading what we can draw…';
 export const INSTRUMENT_LIST_UNAVAILABLE =
   "We couldn't load what we can draw. Check your connection and try again.";
+/* The way on the message above offers. */
+export const INSTRUMENT_LIST_RETRY = 'Try again';
 
 /* Shown instead of a way in, because there is nothing to read on a flat line.
    The fact comes off the Instrument, so this never appears on a quiet day. */

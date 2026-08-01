@@ -11,13 +11,14 @@ import {
   TIME_RESOLUTION_COPY,
   drawnChartTitle,
 } from '@/lib/drawn-chart-copy';
-import { instrumentFor, type FetchLike, type Instrument } from '@/lib/instruments';
+import { fetchJson, type FetchLike } from '@/lib/fetch-json';
+import { instrumentFor, type Instrument } from '@/lib/instruments';
 import { UserFacingError } from '@/lib/user-facing-error';
 
 export type DrawnChartPick = { instrument: string; timeResolution: TimeResolution };
 
-/* The Instrument is the user's pick; the Time resolution becomes one on its own
-   ticket, and everything below here already reads it from the argument. */
+/* The Time resolution every drawn Chart is made at until picking one gets its
+   own ticket. Nothing here reads it: a pick carries its own. */
 export const DEFAULT_TIME_RESOLUTION: TimeResolution = 'thirty_days';
 
 /* CoinGecko has no granularity parameter: the range asked for picks it. What it
@@ -74,14 +75,6 @@ export type DrawnChart = {
 
 type Candle = { time: number; open: number; high: number; low: number; close: number };
 
-function catalogued(symbol: string): Instrument {
-  const instrument = instrumentFor(symbol);
-  /* Not a user's mistake: the list they pick from is drawn from this same
-     catalogue, so anything off it got here through a bug. */
-  if (!instrument) throw new Error(`No instrument named ${symbol}`);
-  return instrument;
-}
-
 function ohlcUrl(instrument: Instrument, timeResolution: TimeResolution): string {
   const days = DAYS_FOR[timeResolution];
   return `${OHLC_ENDPOINT}/${instrument.coinGeckoId}/ohlc?vs_currency=${QUOTE_CURRENCY}&days=${days}`;
@@ -106,18 +99,11 @@ function toCandles(payload: unknown): Candle[] {
 }
 
 /* Takes the URL already built, so resolving the Instrument - a bug when it
-   fails, not a network fault - stays outside the reach of the catch below. */
+   fails, not a network fault - never gets reported as unreachable price data. */
 async function fetchCandles(url: string, fetchImpl: FetchLike): Promise<Candle[]> {
-  let response: Awaited<ReturnType<FetchLike>>;
-  try {
-    response = await fetchImpl(url);
-  } catch {
-    throw new UserFacingError(MARKET_DATA_UNREACHABLE);
-  }
-  if (!response.ok) throw new UserFacingError(MARKET_DATA_UNREACHABLE);
-
-  const payload = await response.json().catch(() => {
-    throw new UserFacingError(MARKET_DATA_UNREADABLE);
+  const payload = await fetchJson(url, fetchImpl, {
+    unreachable: MARKET_DATA_UNREACHABLE,
+    unreadable: MARKET_DATA_UNREADABLE,
   });
 
   const candles = toCandles(payload);
@@ -224,7 +210,11 @@ export async function buildDrawnChart(
   pick: DrawnChartPick,
   fetchImpl: FetchLike = fetch,
 ): Promise<DrawnChart> {
-  const instrument = catalogued(pick.instrument);
+  const instrument = instrumentFor(pick.instrument);
+  /* Not a user's mistake: the list they pick from is drawn from this same
+     catalogue, so a symbol off it got here through a bug. */
+  if (!instrument) throw new Error(`No instrument named ${pick.instrument}`);
+
   const candles = await fetchCandles(ohlcUrl(instrument, pick.timeResolution), fetchImpl);
   return {
     origin: { instrument: pick.instrument, time_resolution: pick.timeResolution },

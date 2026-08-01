@@ -1,10 +1,6 @@
+import type { FetchLike } from '../fetch-json';
 import { INSTRUMENT_LIST_UNAVAILABLE } from '../instrument-copy';
-import {
-  INSTRUMENT_CATALOGUE,
-  fetchInstruments,
-  instrumentFor,
-  type FetchLike,
-} from '../instruments';
+import { INSTRUMENT_CATALOGUE, fetchInstruments, instrumentFor } from '../instruments';
 import { UserFacingError } from '../user-facing-error';
 
 /* Firi answers one row per market, named by the pair with no separator, and

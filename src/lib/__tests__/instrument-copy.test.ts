@@ -1,5 +1,6 @@
 import {
   INSTRUMENT_LIST_LOADING,
+  INSTRUMENT_LIST_RETRY,
   INSTRUMENT_LIST_UNAVAILABLE,
   PICK_INSTRUMENT_DISMISS,
   PICK_INSTRUMENT_TITLE,
@@ -11,6 +12,7 @@ const EVERY_STRING = [
   PICK_INSTRUMENT_DISMISS,
   INSTRUMENT_LIST_LOADING,
   INSTRUMENT_LIST_UNAVAILABLE,
+  INSTRUMENT_LIST_RETRY,
   STABLE_INSTRUMENT_NOTE,
 ];
 
@@ -23,6 +25,10 @@ describe('the words the app uses about Instruments', () => {
 
   it('offers a way on when the list cannot be loaded', () => {
     expect(INSTRUMENT_LIST_UNAVAILABLE).toMatch(/try again/i);
+    /* The button says what the message told the user to do. */
+    expect(INSTRUMENT_LIST_UNAVAILABLE.toLowerCase()).toContain(
+      INSTRUMENT_LIST_RETRY.toLowerCase(),
+    );
     /* The list is ours to load, so nothing here reads as the user's mistake. */
     expect(INSTRUMENT_LIST_UNAVAILABLE).not.toMatch(/you (picked|chose)|your chart/i);
   });

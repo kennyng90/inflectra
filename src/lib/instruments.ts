@@ -5,12 +5,9 @@
    catalogue has never heard of is left out rather than shown broken, because
    silently drawing the wrong thing is worse than a missing one. */
 
+import { fetchJson, type FetchLike } from '@/lib/fetch-json';
 import { INSTRUMENT_LIST_UNAVAILABLE } from '@/lib/instrument-copy';
 import { UserFacingError } from '@/lib/user-facing-error';
-
-/* Only the part of `fetch` the market-data modules use, so a test can stand in
-   for it without building a whole Response. */
-export type FetchLike = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
 
 export type Instrument = {
   /* Firi's base symbol, and what is written onto the Analysis row. */
@@ -62,16 +59,11 @@ function kronerSymbols(payload: unknown): string[] {
 /* The Instruments on offer right now. `fetch` is the last argument, the way
    every other module here takes its client. */
 export async function fetchInstruments(fetchImpl: FetchLike = fetch): Promise<Instrument[]> {
-  let response: Awaited<ReturnType<FetchLike>>;
-  try {
-    response = await fetchImpl(FIRI_MARKETS_ENDPOINT);
-  } catch {
-    throw new UserFacingError(INSTRUMENT_LIST_UNAVAILABLE);
-  }
-  if (!response.ok) throw new UserFacingError(INSTRUMENT_LIST_UNAVAILABLE);
-
-  const payload = await response.json().catch(() => {
-    throw new UserFacingError(INSTRUMENT_LIST_UNAVAILABLE);
+  /* One message either way: which of the two went wrong changes nothing the
+     user can do about it. */
+  const payload = await fetchJson(FIRI_MARKETS_ENDPOINT, fetchImpl, {
+    unreachable: INSTRUMENT_LIST_UNAVAILABLE,
+    unreadable: INSTRUMENT_LIST_UNAVAILABLE,
   });
 
   const sold = new Set(kronerSymbols(payload));

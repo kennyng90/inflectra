@@ -1,20 +1,20 @@
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Dialog } from '@/components/dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { OpacityPressable } from '@/components/opacity-pressable';
-import { OverlayCard } from '@/components/overlay-card';
 import { DRAWING_CHART_ACTION, DRAW_CHART_ACTION } from '@/lib/drawn-chart-copy';
 import {
   INSTRUMENT_LIST_LOADING,
-  INSTRUMENT_LIST_UNAVAILABLE,
+  INSTRUMENT_LIST_RETRY,
   PICK_INSTRUMENT_DISMISS,
   PICK_INSTRUMENT_TITLE,
   STABLE_INSTRUMENT_NOTE,
 } from '@/lib/instrument-copy';
-import { fetchInstruments, type Instrument } from '@/lib/instruments';
-import { userFacingMessage } from '@/lib/user-facing-error';
+import type { Instrument } from '@/lib/instruments';
+import { useInstrumentList } from '@/lib/use-instrument-list';
 import { useTheme } from '@/theme';
 
 /* Tall enough to read as a list, short enough to leave the way out on screen;
@@ -35,30 +35,11 @@ type InstrumentPickerProps = {
 export function InstrumentPicker({ busy, disabled, onPick }: InstrumentPickerProps) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
-  const [instruments, setInstruments] = useState<Instrument[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const loadGeneration = useRef(0);
+  const { instruments, error, load } = useInstrumentList();
 
-  const load = useCallback(async () => {
-    const generation = ++loadGeneration.current;
-    setError(null);
-    setInstruments(null);
-    try {
-      const listed = await fetchInstruments();
-      /* A load left behind by an earlier opening must not stomp this one. */
-      if (generation === loadGeneration.current) setInstruments(listed);
-    } catch (caught) {
-      if (generation === loadGeneration.current) {
-        setError(userFacingMessage(caught, INSTRUMENT_LIST_UNAVAILABLE));
-      }
-    }
-  }, []);
-
-  /* Loaded on every opening rather than once: what Firi sells can change while
-     the app is running. */
   const openPicker = () => {
     setOpen(true);
-    void load();
+    load();
   };
 
   const pick = (instrument: Instrument) => {
@@ -77,57 +58,55 @@ export function InstrumentPicker({ busy, disabled, onPick }: InstrumentPickerPro
         onPress={openPicker}
       />
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: theme.spacing.space20,
-            backgroundColor: theme.colors.fillOverlay,
-          }}>
-          <OverlayCard accessibilityViewIsModal style={{ width: '100%' }}>
-            <Text
-              accessibilityRole="header"
-              style={{
-                ...theme.text.heading4,
-                fontWeight: theme.fontWeight.strong,
-                color: theme.colors.textStrong,
-              }}>
-              {PICK_INSTRUMENT_TITLE}
-            </Text>
+      <Dialog visible={open} title={PICK_INSTRUMENT_TITLE} onRequestClose={() => setOpen(false)}>
+        <InstrumentList instruments={instruments} error={error} onPick={pick} />
 
-            {error ? (
-              <ErrorNotice message={error} />
-            ) : instruments ? (
-              <ScrollView style={{ maxHeight: LIST_MAX_HEIGHT }}>
-                {instruments.map((instrument) => (
-                  <InstrumentRow
-                    key={instrument.symbol}
-                    instrument={instrument}
-                    onPick={() => pick(instrument)}
-                  />
-                ))}
-              </ScrollView>
-            ) : (
-              <ActivityIndicator
-                accessibilityLabel={INSTRUMENT_LIST_LOADING}
-                style={{ paddingVertical: theme.spacing.space32 }}
-              />
-            )}
-
-            <View style={{ gap: theme.spacing.space8, paddingTop: theme.spacing.space8 }}>
-              {error && <Button label="Try again" onPress={load} />}
-              <Button
-                label={PICK_INSTRUMENT_DISMISS}
-                variant="secondary"
-                onPress={() => setOpen(false)}
-              />
-            </View>
-          </OverlayCard>
+        <View style={{ gap: theme.spacing.space8, paddingTop: theme.spacing.space8 }}>
+          {error && <Button label={INSTRUMENT_LIST_RETRY} onPress={load} />}
+          <Button
+            label={PICK_INSTRUMENT_DISMISS}
+            variant="secondary"
+            onPress={() => setOpen(false)}
+          />
         </View>
-      </Modal>
+      </Dialog>
     </>
+  );
+}
+
+/* One of three: why the list isn't here, the list, or the wait for it. */
+function InstrumentList({
+  instruments,
+  error,
+  onPick,
+}: {
+  instruments: Instrument[] | null;
+  error: string | null;
+  onPick: (instrument: Instrument) => void;
+}) {
+  const theme = useTheme();
+
+  if (error) return <ErrorNotice message={error} />;
+
+  if (!instruments) {
+    return (
+      <ActivityIndicator
+        accessibilityLabel={INSTRUMENT_LIST_LOADING}
+        style={{ paddingVertical: theme.spacing.space32 }}
+      />
+    );
+  }
+
+  return (
+    <ScrollView style={{ maxHeight: LIST_MAX_HEIGHT }}>
+      {instruments.map((instrument) => (
+        <InstrumentRow
+          key={instrument.symbol}
+          instrument={instrument}
+          onPick={() => onPick(instrument)}
+        />
+      ))}
+    </ScrollView>
   );
 }
 

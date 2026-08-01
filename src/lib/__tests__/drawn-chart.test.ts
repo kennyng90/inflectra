@@ -1,11 +1,12 @@
 import { TIME_RESOLUTIONS } from '../chart-origin';
-import { DRAWING_HEIGHT, DRAWING_WIDTH, MIN_CANDLES, buildDrawnChart } from '../drawn-chart';
-import { INSTRUMENT_CATALOGUE, type FetchLike } from '../instruments';
 import {
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
   NOT_ENOUGH_MARKET_DATA,
 } from '../drawn-chart-copy';
+import { DRAWING_HEIGHT, DRAWING_WIDTH, MIN_CANDLES, buildDrawnChart } from '../drawn-chart';
+import type { FetchLike } from '../fetch-json';
+import { INSTRUMENT_CATALOGUE } from '../instruments';
 import { UserFacingError } from '../user-facing-error';
 
 /* CoinGecko answers [openTimeMs, open, high, low, close]. */
@@ -183,34 +184,32 @@ describe('buildDrawnChart', () => {
   });
 
   it('fails when the price data cannot be reached', async () => {
-    await expect(
-      buildDrawnChart(PICK, stubFetch(candles(), false)),
-    ).rejects.toThrow(MARKET_DATA_UNREACHABLE);
+    await expect(buildDrawnChart(PICK, stubFetch(candles(), false))).rejects.toThrow(
+      MARKET_DATA_UNREACHABLE,
+    );
 
     const offline = jest.fn(async () => {
       throw new TypeError('Network request failed');
     }) as unknown as FetchLike;
-    await expect(buildDrawnChart(PICK, offline)).rejects.toThrow(
-      MARKET_DATA_UNREACHABLE,
-    );
+    await expect(buildDrawnChart(PICK, offline)).rejects.toThrow(MARKET_DATA_UNREACHABLE);
   });
 
   it('fails on an answer it cannot read rather than drawing half a Chart', async () => {
     await expect(buildDrawnChart(PICK, stubFetch({ status: 'ok' }))).rejects.toThrow(
       MARKET_DATA_UNREADABLE,
     );
-    await expect(
-      buildDrawnChart(PICK, stubFetch([[1, 2, 3]])),
-    ).rejects.toThrow(MARKET_DATA_UNREADABLE);
+    await expect(buildDrawnChart(PICK, stubFetch([[1, 2, 3]]))).rejects.toThrow(
+      MARKET_DATA_UNREADABLE,
+    );
     await expect(
       buildDrawnChart(PICK, stubFetch(candles().concat([[1, 2, 3, 4, null]] as never))),
     ).rejects.toThrow(MARKET_DATA_UNREADABLE);
   });
 
   it('fails when there are too few candles to read anything from', async () => {
-    await expect(
-      buildDrawnChart(PICK, stubFetch(candles(MIN_CANDLES - 1))),
-    ).rejects.toThrow(NOT_ENOUGH_MARKET_DATA);
+    await expect(buildDrawnChart(PICK, stubFetch(candles(MIN_CANDLES - 1)))).rejects.toThrow(
+      NOT_ENOUGH_MARKET_DATA,
+    );
   });
 
   /* The list is the only way to ask for an Instrument, so one off it is our own
