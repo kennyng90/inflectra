@@ -2,6 +2,7 @@ import type { Analysis } from '@/lib/analysis-contract';
 import { ANALYZE_SIGN_IN_ERROR } from '@/lib/analysis-copy';
 import type { AnalyzeProgress } from '@/lib/analyzing-copy';
 import type { ChartOrigin } from '@/lib/chart-origin';
+import { DRAWN_CHART_UNREADABLE } from '@/lib/drawn-chart-copy';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
@@ -72,6 +73,16 @@ export function analyzeFlowReducer(
         progress: { step: 'preparing', startedAt: event.startedAt },
       };
     case 'reject':
+      /* A Rejection judges an image the user supplied. On a Chart we drew, the
+         AI failing to read it is our own defect, so it fails - retryably - and
+         the Rejection screen stays away. */
+      if (state.chart?.origin) {
+        return {
+          ...state,
+          phase: 'failed',
+          error: DRAWN_CHART_UNREADABLE,
+        };
+      }
       return {
         ...state,
         phase: 'rejected',

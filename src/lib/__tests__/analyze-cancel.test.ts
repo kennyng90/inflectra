@@ -61,6 +61,10 @@ const mockClient = {
 const client = mockClient as unknown as AnalysisStoreClient;
 
 const chart = { uri: 'file:///picked.jpg', width: 1200, height: 800 };
+const drawnChart = {
+  ...chart,
+  origin: { instrument: 'BTC', time_resolution: 'two_days' as const },
+};
 
 const analysis = {
   is_chart: true,
@@ -149,6 +153,23 @@ describe('analyzeChart cancellation', () => {
     expect(resolveInvoke).toBeNull();
     expect(removed).toEqual([[uploaded[0]]]);
     expect(deleted).toEqual([]);
+  });
+
+  /* Cancel means the same thing whoever drew the Chart: nothing in storage and
+     no row in History, even though the function saved one after we stopped
+     listening. */
+  it('leaves a canceled drawn run with nothing behind either', async () => {
+    const controller = new AbortController();
+    const run = analyzeChart(drawnChart, 'user-1', { signal: controller.signal }, client);
+    await settle();
+    controller.abort();
+    await expect(run).rejects.toBeInstanceOf(CanceledError);
+
+    resolveInvoke!({ data: analysis, error: null });
+    await settle();
+
+    expect(deleted).toEqual([{ column: 'storage_path', value: uploaded[0] }]);
+    expect(removed).toEqual([[uploaded[0]]]);
   });
 
   it('cancels before uploading when the user is quick', async () => {

@@ -15,6 +15,9 @@ export const NOT_ENOUGH_MARKET_DATA =
 /* Anything else that stopped the drawing. The user did not supply the image, so
    nothing here blames them for it. */
 export const DRAWING_FAILED = "We couldn't draw a chart just now. Try again.";
+/* The AI could not read a Chart we drew ourselves. That is a defect in our own
+   drawing, so it reads as ours to fix rather than as a Rejection. */
+export const DRAWN_CHART_UNREADABLE = "We couldn't draw a readable chart this time. Try again.";
 
 export type TimeResolutionCopy = {
   /* What the choice is called. */

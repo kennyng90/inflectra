@@ -192,6 +192,20 @@ describe('buildDrawnChart', () => {
     ).rejects.toThrow(MARKET_DATA_UNREADABLE);
   });
 
+  /* An error page answered with a 200 is not JSON at all. */
+  it('fails on an answer that is not JSON', async () => {
+    const html: FetchLike = async () => ({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected token <');
+      },
+    });
+
+    await expect(buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, html)).rejects.toThrow(
+      MARKET_DATA_UNREADABLE,
+    );
+  });
+
   it('fails when there are too few candles to read anything from', async () => {
     await expect(
       buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles(MIN_CANDLES - 1))),
