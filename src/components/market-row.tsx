@@ -8,7 +8,7 @@ import type { MarketQuote } from '@/lib/market';
 import { PAST_WEEK, priceInKroner, priceMove, type PriceDirection } from '@/lib/market-copy';
 import { useTheme, type Theme } from '@/theme';
 
-const moveColors: Record<PriceDirection, (theme: Theme) => string> = {
+const moveColor: Record<PriceDirection, (theme: Theme) => string> = {
   rising: (theme) => theme.colors.textSuccess,
   falling: (theme) => theme.colors.textError,
   flat: (theme) => theme.colors.textWeak,
@@ -25,7 +25,7 @@ export function MarketRow({ quote, onPick }: { quote: MarketQuote; onPick: () =>
   const theme = useTheme();
   const move = priceMove(quote.changePercent);
 
-  const card = (
+  const contents = (
     <>
       <Line
         left={
@@ -60,7 +60,7 @@ export function MarketRow({ quote, onPick }: { quote: MarketQuote; onPick: () =>
             style={{
               ...theme.text.tiny,
               fontWeight: theme.fontWeight.strong,
-              color: moveColors[move.direction](theme),
+              color: moveColor[move.direction](theme),
             }}>
             {move.label}
           </Text>
@@ -69,7 +69,7 @@ export function MarketRow({ quote, onPick }: { quote: MarketQuote; onPick: () =>
     </>
   );
 
-  const style = {
+  const cardStyle = {
     paddingVertical: theme.spacing.space16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.strokeWeak,
@@ -81,8 +81,8 @@ export function MarketRow({ quote, onPick }: { quote: MarketQuote; onPick: () =>
      its way in, rather than offering an Analysis of a flat line. */
   if (quote.instrument.stable) {
     return (
-      <View style={style}>
-        {card}
+      <View style={cardStyle}>
+        {contents}
         <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>
           {STABLE_INSTRUMENT_NOTE}
         </Text>
@@ -96,8 +96,8 @@ export function MarketRow({ quote, onPick }: { quote: MarketQuote; onPick: () =>
       accessibilityLabel={quote.instrument.name}
       hitSlop={0}
       onPress={onPick}
-      style={style}>
-      {card}
+      style={cardStyle}>
+      {contents}
     </OpacityPressable>
   );
 }

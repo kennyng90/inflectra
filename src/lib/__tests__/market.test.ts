@@ -1,8 +1,8 @@
-import type { FetchLike } from '../fetch-json';
-import { PRICES_RATE_LIMITED, PRICES_UNAVAILABLE, PRICES_UNREADABLE } from '../market-copy';
-import { MIN_PREVIEW_RANGE, fetchMarket, previewPoints } from '../market';
 import type { Instrument } from '../instruments';
+import { MIN_PREVIEW_RANGE, fetchMarket, previewPoints } from '../market';
+import { PRICES_RATE_LIMITED, PRICES_UNAVAILABLE, PRICES_UNREADABLE } from '../market-copy';
 import { UserFacingError } from '../user-facing-error';
+import { offlineFetch, stubFetch } from '@/test-support/stub-fetch';
 
 const instrument = (symbol: string, coinGeckoId: string, stable = false): Instrument => ({
   symbol,
@@ -33,13 +33,6 @@ const COIN_GECKO = [
   row('bitcoin', 1_240_000, 2.4, [1_200_000, 1_260_000, 1_240_000]),
   row('usd-coin', 10.11, 0.01, [10.1, 10.12, 10.11]),
 ];
-
-function stubFetch(
-  body: unknown,
-  { ok = true, status = 200 } = {},
-): jest.MockedFunction<FetchLike> {
-  return jest.fn(async (_url: string) => ({ ok, status, json: async () => body }));
-}
 
 const symbolsOf = (quotes: { instrument: Instrument }[]) =>
   quotes.map((quote) => quote.instrument.symbol);
@@ -107,10 +100,7 @@ describe('fetchMarket', () => {
       PRICES_UNAVAILABLE,
     );
 
-    const offline = jest.fn(async () => {
-      throw new TypeError('Network request failed');
-    }) as unknown as FetchLike;
-    await expect(fetchMarket(LISTED, offline)).rejects.toThrow(PRICES_UNAVAILABLE);
+    await expect(fetchMarket(LISTED, offlineFetch())).rejects.toThrow(PRICES_UNAVAILABLE);
   });
 
   it('fails on an answer it cannot read rather than pricing half the list', async () => {

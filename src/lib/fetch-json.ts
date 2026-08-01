@@ -36,8 +36,8 @@ export async function fetchJson(
     throw new UserFacingError(failure.unreachable);
   }
   if (!response.ok) {
-    const limited = response.status === TOO_MANY_REQUESTS && failure.rateLimited;
-    throw new UserFacingError(limited || failure.unreachable);
+    const limited = response.status === TOO_MANY_REQUESTS ? failure.rateLimited : undefined;
+    throw new UserFacingError(limited ?? failure.unreachable);
   }
 
   return response.json().catch(() => {

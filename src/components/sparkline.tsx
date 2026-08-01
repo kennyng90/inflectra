@@ -6,7 +6,7 @@ import { useTheme } from '@/theme';
 /* The shape's own coordinate space. Its width is roughly the width a card gives
    it, so stretching one to the other barely distorts the line. */
 const SHAPE_WIDTH = 320;
-export const SPARKLINE_HEIGHT = 40;
+const SHAPE_HEIGHT = 40;
 
 /* A line, which no scale has an opinion about. */
 const LINE_WIDTH = 2;
@@ -26,7 +26,7 @@ const LINE_WIDTH = 2;
    only draws what it worked out. */
 export function Sparkline({ prices }: { prices: number[] }) {
   const theme = useTheme();
-  const points = previewPoints(prices, SHAPE_WIDTH, SPARKLINE_HEIGHT);
+  const points = previewPoints(prices, SHAPE_WIDTH, SHAPE_HEIGHT);
 
   /* A week too short to be a shape draws nothing rather than a stray dot. */
   if (points.length === 0) return null;
@@ -34,8 +34,8 @@ export function Sparkline({ prices }: { prices: number[] }) {
   return (
     <Svg
       width="100%"
-      height={SPARKLINE_HEIGHT}
-      viewBox={`0 0 ${SHAPE_WIDTH} ${SPARKLINE_HEIGHT}`}
+      height={SHAPE_HEIGHT}
+      viewBox={`0 0 ${SHAPE_WIDTH} ${SHAPE_HEIGHT}`}
       preserveAspectRatio="none">
       <Polyline
         points={points.map((point) => `${point.x},${point.y}`).join(' ')}

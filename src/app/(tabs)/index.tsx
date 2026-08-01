@@ -35,22 +35,12 @@ export default function MarketScreen() {
     router.push({ pathname: '/analyze', params: { instrument } });
 
   const renderBody = () => {
-    if (quotes === null && error === null) {
-      return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator
-            accessibilityLabel={PRICES_LOADING}
-            size="large"
-            color={theme.colors.interactiveAction}
-          />
-        </View>
-      );
-    }
-
-    if (quotes === null) {
+    /* Nothing to show and a reason why: the whole screen is the failure. A
+       failure with prices already on it is a line in the list header instead. */
+    if (quotes === null && error !== null) {
       return (
         <>
-          <EmptyState heading={PRICES_FAILED_TITLE} body={error ?? ''} />
+          <EmptyState heading={PRICES_FAILED_TITLE} body={error} />
           <View
             style={{
               padding: theme.spacing.space20,
@@ -66,6 +56,18 @@ export default function MarketScreen() {
             <OwnPictureButton />
           </View>
         </>
+      );
+    }
+
+    if (quotes === null) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator
+            accessibilityLabel={PRICES_LOADING}
+            size="large"
+            color={theme.colors.interactiveAction}
+          />
+        </View>
       );
     }
 

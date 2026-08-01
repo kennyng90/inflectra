@@ -39,12 +39,10 @@ function marketsUrl(instruments: Instrument[]): string {
   return `${MARKETS_ENDPOINT}?${query}`;
 }
 
-type PricedRow = {
-  id: string;
-  price: number;
-  changePercent: number;
-  preview: number[];
-};
+/* Everything a card says about an Instrument except which Instrument it is. */
+type Priced = Omit<MarketQuote, 'instrument'>;
+/* One row of the answer: that, plus the id it is matched to an Instrument by. */
+type PricedRow = { id: string } & Priced;
 
 const isNumber = (value: unknown): value is number => Number.isFinite(value);
 
@@ -92,17 +90,17 @@ export async function fetchMarket(
   });
 
   if (!Array.isArray(payload)) throw new UserFacingError(PRICES_UNREADABLE);
-  const priced = new Map(payload.map(toPricedRow).map((row) => [row.id, row]));
+  const pricedById = new Map<string, Priced>(
+    payload.map(toPricedRow).map(({ id, ...priced }) => [id, priced]),
+  );
 
   /* The order asked for, not the order priced: the answer comes back sorted by
      what these coins are worth in total, which is not what the app offers. */
   const quotes = instruments.flatMap((instrument) => {
-    const row = priced.get(instrument.coinGeckoId);
+    const priced = pricedById.get(instrument.coinGeckoId);
     /* One Instrument the price source has never heard of is one card short,
        not the screen gone. */
-    return row
-      ? [{ instrument, price: row.price, changePercent: row.changePercent, preview: row.preview }]
-      : [];
+    return priced ? [{ instrument, ...priced }] : [];
   });
 
   /* Nothing priced at all is a broken answer, not an empty market. */

@@ -52,12 +52,18 @@ const SPOKEN: Record<PriceDirection, string> = {
   flat: 'Flat',
 };
 
-/* How a price has moved over the week the preview covers. Flat is whatever
-   rounds to nothing at the precision shown, so no card ever claims a direction
-   next to a "0,0%" that contradicts it. */
+/* Flat is whatever rounds to nothing at the precision shown, so no card ever
+   claims a direction next to a "0,0%" that contradicts it. */
+function directionOf(rounded: number): PriceDirection {
+  if (rounded > 0) return 'rising';
+  if (rounded < 0) return 'falling';
+  return 'flat';
+}
+
+/* How a price has moved over the week the preview covers. */
 export function priceMove(percent: number): PriceMove {
   const rounded = Number(percent.toFixed(MOVE_DECIMALS));
-  const direction: PriceDirection = rounded > 0 ? 'rising' : rounded < 0 ? 'falling' : 'flat';
+  const direction = directionOf(rounded);
   const size = `${norwegianNumber(Math.abs(rounded), MOVE_DECIMALS)}%`;
   return {
     label: direction === 'flat' ? size : `${ARROW[direction]} ${size}`,
