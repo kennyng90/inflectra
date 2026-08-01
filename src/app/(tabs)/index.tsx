@@ -8,12 +8,14 @@ import { AnalyzingProgress } from '@/components/analyzing-progress';
 import { Button, BUTTON_HEIGHT } from '@/components/button';
 import { ChartOverlay } from '@/components/chart-overlay';
 import { EmptyState } from '@/components/empty-state';
+import { InstrumentPicker } from '@/components/instrument-picker';
 import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
+import { DEFAULT_TIME_RESOLUTION } from '@/lib/drawn-chart';
 import { useDrawnChartCapture } from '@/lib/drawn-chart-capture';
-import { DRAWING_CHART_ACTION, DRAW_CHART_ACTION } from '@/lib/drawn-chart-copy';
+import type { Instrument } from '@/lib/instruments';
 import { useTheme } from '@/theme';
 
 /* What a failed attempt to source a Chart left behind. */
@@ -52,6 +54,12 @@ export default function AnalyzeScreen() {
     if (outcome.status === 'picked') pickChart(outcome.chart);
     else setCaptureNote(outcome);
   };
+
+  /* The Instrument is the user's; the Time resolution becomes theirs next. */
+  const draw = (instrument: Instrument) =>
+    capture(() =>
+      drawChart({ instrument: instrument.symbol, timeResolution: DEFAULT_TIME_RESOLUTION }),
+    );
 
   const analyze = async () => {
     /* Whatever the analysis has to say outranks a stale capture note. */
@@ -162,14 +170,7 @@ export default function AnalyzeScreen() {
               disabled={sourcingBlocked}
               onPress={() => capture(chooseChartFromLibrary)}
             />
-            <Button
-              label={drawing ? DRAWING_CHART_ACTION : DRAW_CHART_ACTION}
-              variant="secondary"
-              icon="chart.xyaxis.line"
-              iconFallback="📈"
-              disabled={sourcingBlocked}
-              onPress={() => capture(drawChart)}
-            />
+            <InstrumentPicker busy={drawing} disabled={sourcingBlocked} onPick={draw} />
 
             {/* Last in the stack: a repair step, not the way forward. */}
             {cameraOff && !analyzing && (

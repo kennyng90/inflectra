@@ -11,35 +11,14 @@ import {
   TIME_RESOLUTION_COPY,
   drawnChartTitle,
 } from '@/lib/drawn-chart-copy';
+import { instrumentFor, type FetchLike, type Instrument } from '@/lib/instruments';
 import { UserFacingError } from '@/lib/user-facing-error';
-
-/* Only the part of `fetch` this module uses, so a test can stand in for it
-   without building a whole Response. */
-export type FetchLike = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
-
-export type Instrument = {
-  /* Written onto the Analysis row as the Chart's origin. */
-  symbol: string;
-  /* What the Chart's title calls it. */
-  name: string;
-  coinGeckoId: string;
-};
-
-/* Instruments Inflectra can draw today. Picking from a list is what stops the
-   user asking for something CoinGecko has never heard of. */
-export const INSTRUMENTS: Instrument[] = [
-  { symbol: 'BTC', name: 'Bitcoin', coinGeckoId: 'bitcoin' },
-  { symbol: 'ETH', name: 'Ethereum', coinGeckoId: 'ethereum' },
-];
 
 export type DrawnChartPick = { instrument: string; timeResolution: TimeResolution };
 
-/* The tracer bullet draws one thing. The pick becomes the user's on its own
-   ticket; everything below here already reads it from the argument. */
-export const DEFAULT_DRAWN_CHART_PICK: DrawnChartPick = {
-  instrument: 'BTC',
-  timeResolution: 'thirty_days',
-};
+/* The Instrument is the user's pick; the Time resolution becomes one on its own
+   ticket, and everything below here already reads it from the argument. */
+export const DEFAULT_TIME_RESOLUTION: TimeResolution = 'thirty_days';
 
 /* CoinGecko has no granularity parameter: the range asked for picks it. What it
    does have is a closed list of ranges - 1, 7, 14, 30, 90, 180, 365 - and no key
@@ -95,9 +74,10 @@ export type DrawnChart = {
 
 type Candle = { time: number; open: number; high: number; low: number; close: number };
 
-function instrumentFor(symbol: string): Instrument {
-  const instrument = INSTRUMENTS.find((candidate) => candidate.symbol === symbol);
-  /* Not a user's mistake: the list is the only way to ask for one. */
+function catalogued(symbol: string): Instrument {
+  const instrument = instrumentFor(symbol);
+  /* Not a user's mistake: the list they pick from is drawn from this same
+     catalogue, so anything off it got here through a bug. */
   if (!instrument) throw new Error(`No instrument named ${symbol}`);
   return instrument;
 }
@@ -244,7 +224,7 @@ export async function buildDrawnChart(
   pick: DrawnChartPick,
   fetchImpl: FetchLike = fetch,
 ): Promise<DrawnChart> {
-  const instrument = instrumentFor(pick.instrument);
+  const instrument = catalogued(pick.instrument);
   const candles = await fetchCandles(ohlcUrl(instrument, pick.timeResolution), fetchImpl);
   return {
     origin: { instrument: pick.instrument, time_resolution: pick.timeResolution },

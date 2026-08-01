@@ -5,7 +5,6 @@ import { captureRef } from 'react-native-view-shot';
 import { DrawnChartCanvas } from '@/components/drawn-chart-canvas';
 import type { CaptureOutcome } from '@/lib/chart-capture';
 import {
-  DEFAULT_DRAWN_CHART_PICK,
   DRAWING_HEIGHT,
   DRAWING_WIDTH,
   buildDrawnChart,
@@ -25,7 +24,7 @@ const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() 
 /* The third way a Chart arrives, alongside the camera and the photo library. It
    needs a mounted view to capture, so it comes as a pair: the source the screen
    calls, and the off-screen canvas the screen has to render. */
-export function useDrawnChartCapture(pick: DrawnChartPick = DEFAULT_DRAWN_CHART_PICK) {
+export function useDrawnChartCapture() {
   const [onCanvas, setOnCanvas] = useState<DrawnChart | null>(null);
   const [busy, setBusy] = useState(false);
   const canvasRef = useRef<View>(null);
@@ -37,7 +36,7 @@ export function useDrawnChartCapture(pick: DrawnChartPick = DEFAULT_DRAWN_CHART_
     mountedRef.current = null;
   }, [onCanvas]);
 
-  const drawChart = async (): Promise<CaptureOutcome> => {
+  const drawChart = async (pick: DrawnChartPick): Promise<CaptureOutcome> => {
     setBusy(true);
     try {
       const chart = await buildDrawnChart(pick);

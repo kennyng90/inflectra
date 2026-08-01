@@ -29,6 +29,20 @@ are, by and large, the ones with the volume to make a shape mean something.
 The list is fetched, not hardcoded to nine forever. Firi adding a tenth NOK pair should add a tenth
 Instrument without a release.
 
+### Correction, 2026-08-01
+
+A tenth pair needs a release after all. Firi says which Instruments *exist*; it does not say what
+any of them is. Drawing one takes its identifier at CoinGecko, and offering one takes a plain name
+and the `stable` fact - none of which is in Firi's answer, and none of which can be derived from a
+symbol without risking a Chart of the wrong thing under the right name.
+
+So a static catalogue holds those three facts per Instrument, and a fetched NOK pair with no entry
+in it is left out rather than shown broken. Adding a tenth Instrument is a one-line catalogue
+addition and a release.
+
+Firi still decides the list: it can drop a pair, or stop quoting one in kroner, and the app follows
+the same day, with no release at all. What it cannot do on its own is add one.
+
 ## What this costs
 
 - **The prices still come from CoinGecko** (ADR 0003), because Firi has no OHLC endpoint. Firi picks

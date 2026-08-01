@@ -1,12 +1,6 @@
 import { TIME_RESOLUTIONS } from '../chart-origin';
-import {
-  DEFAULT_DRAWN_CHART_PICK,
-  DRAWING_HEIGHT,
-  DRAWING_WIDTH,
-  MIN_CANDLES,
-  buildDrawnChart,
-  type FetchLike,
-} from '../drawn-chart';
+import { DRAWING_HEIGHT, DRAWING_WIDTH, MIN_CANDLES, buildDrawnChart } from '../drawn-chart';
+import { INSTRUMENT_CATALOGUE, type FetchLike } from '../instruments';
 import {
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
@@ -38,6 +32,10 @@ function stubFetch(body: unknown, ok = true): jest.MockedFunction<FetchLike> {
   return jest.fn(async (_url: string) => ({ ok, json: async () => body }));
 }
 
+/* Whatever the user picked: the assertions below are about the drawing, not
+   about which Instrument is in it. */
+const PICK = { instrument: 'BTC', timeResolution: 'thirty_days' } as const;
+
 describe('buildDrawnChart', () => {
   it('asks CoinGecko for the picked Instrument, priced in NOK', async () => {
     const fetchImpl = stubFetch(candles());
@@ -47,6 +45,23 @@ describe('buildDrawnChart', () => {
     const url = fetchImpl.mock.calls[0][0];
     expect(url).toContain('/coins/bitcoin/ohlc');
     expect(url).toContain('vs_currency=nok');
+  });
+
+  /* Whatever Firi is selling today, the pick that comes back is drawable: the
+     catalogue is the same one both sides read. */
+  it('draws every Instrument the catalogue lists', async () => {
+    for (const instrument of INSTRUMENT_CATALOGUE) {
+      const fetchImpl = stubFetch(candles());
+
+      const drawn = await buildDrawnChart(
+        { instrument: instrument.symbol, timeResolution: 'thirty_days' },
+        fetchImpl,
+      );
+
+      expect(fetchImpl.mock.calls[0][0]).toContain(`/coins/${instrument.coinGeckoId}/ohlc`);
+      expect(drawn.title).toContain(instrument.name);
+      expect(drawn.origin.instrument).toBe(instrument.symbol);
+    }
   });
 
   /* Only a listed range is answered at all, so each resolution asks for the one
@@ -67,7 +82,7 @@ describe('buildDrawnChart', () => {
   it('turns a well-formed answer into candles and axis ticks', async () => {
     const rows = candles();
 
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(rows));
+    const drawn = await buildDrawnChart(PICK, stubFetch(rows));
 
     expect(drawn.origin).toEqual({ instrument: 'BTC', time_resolution: 'thirty_days' });
     expect(drawn.candles).toHaveLength(rows.length);
@@ -79,7 +94,7 @@ describe('buildDrawnChart', () => {
   });
 
   it('reads a rising candle as rising and a falling one as falling', async () => {
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles()));
+    const drawn = await buildDrawnChart(PICK, stubFetch(candles()));
 
     expect(drawn.candles.map((candle) => candle.rising).slice(0, 4)).toEqual([
       true,
@@ -90,7 +105,7 @@ describe('buildDrawnChart', () => {
   });
 
   it('keeps every coordinate inside the drawing area', async () => {
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles()));
+    const drawn = await buildDrawnChart(PICK, stubFetch(candles()));
     const { plot } = drawn;
     const right = plot.x + plot.width;
     const bottom = plot.y + plot.height;
@@ -118,7 +133,7 @@ describe('buildDrawnChart', () => {
     const highest = Math.max(...rows.map((row) => row[2]));
     const lowest = Math.min(...rows.map((row) => row[3]));
 
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(rows));
+    const drawn = await buildDrawnChart(PICK, stubFetch(rows));
     const bottom = drawn.plot.y + drawn.plot.height;
 
     const tops = rows.map((row, index) => (row[2] === highest ? drawn.candles[index].wickTop : null));
@@ -142,7 +157,7 @@ describe('buildDrawnChart', () => {
       100,
     ]);
 
-    const drawn = await buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(flat));
+    const drawn = await buildDrawnChart(PICK, stubFetch(flat));
 
     for (const candle of drawn.candles) {
       expect(Number.isFinite(candle.wickTop)).toBe(true);
@@ -169,32 +184,32 @@ describe('buildDrawnChart', () => {
 
   it('fails when the price data cannot be reached', async () => {
     await expect(
-      buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles(), false)),
+      buildDrawnChart(PICK, stubFetch(candles(), false)),
     ).rejects.toThrow(MARKET_DATA_UNREACHABLE);
 
     const offline = jest.fn(async () => {
       throw new TypeError('Network request failed');
     }) as unknown as FetchLike;
-    await expect(buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, offline)).rejects.toThrow(
+    await expect(buildDrawnChart(PICK, offline)).rejects.toThrow(
       MARKET_DATA_UNREACHABLE,
     );
   });
 
   it('fails on an answer it cannot read rather than drawing half a Chart', async () => {
-    await expect(buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch({ status: 'ok' }))).rejects.toThrow(
+    await expect(buildDrawnChart(PICK, stubFetch({ status: 'ok' }))).rejects.toThrow(
       MARKET_DATA_UNREADABLE,
     );
     await expect(
-      buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch([[1, 2, 3]])),
+      buildDrawnChart(PICK, stubFetch([[1, 2, 3]])),
     ).rejects.toThrow(MARKET_DATA_UNREADABLE);
     await expect(
-      buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles().concat([[1, 2, 3, 4, null]] as never))),
+      buildDrawnChart(PICK, stubFetch(candles().concat([[1, 2, 3, 4, null]] as never))),
     ).rejects.toThrow(MARKET_DATA_UNREADABLE);
   });
 
   it('fails when there are too few candles to read anything from', async () => {
     await expect(
-      buildDrawnChart(DEFAULT_DRAWN_CHART_PICK, stubFetch(candles(MIN_CANDLES - 1))),
+      buildDrawnChart(PICK, stubFetch(candles(MIN_CANDLES - 1))),
     ).rejects.toThrow(NOT_ENOUGH_MARKET_DATA);
   });
 
