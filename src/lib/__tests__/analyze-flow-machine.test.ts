@@ -5,11 +5,17 @@ import {
   initialAnalyzeFlowState,
   type PickedChart,
 } from '../analyze-flow-machine';
+import { DRAWN_CHART_UNREADABLE } from '../drawn-chart-copy';
 
 const chart: PickedChart = {
   uri: 'file:///picked.jpg',
   width: 1200,
   height: 800,
+};
+
+const drawnChart: PickedChart = {
+  ...chart,
+  origin: { instrument: 'BTC', time_resolution: 'two_days' },
 };
 
 const analysis: Analysis = {
@@ -62,14 +68,9 @@ describe('analyzeFlowReducer', () => {
   });
 
   it("carries a drawn Chart's origin through pick", () => {
-    const drawn: PickedChart = {
-      ...chart,
-      origin: { instrument: 'BTC', time_resolution: 'two_days' },
-    };
+    const ready = analyzeFlowReducer(initialAnalyzeFlowState, { type: 'pick', chart: drawnChart });
 
-    const ready = analyzeFlowReducer(initialAnalyzeFlowState, { type: 'pick', chart: drawn });
-
-    expect(ready.chart).toEqual(drawn);
+    expect(ready.chart).toEqual(drawnChart);
     /* A supplied Chart says nothing about where it came from. */
     expect(analyzeFlowReducer(ready, { type: 'pick', chart }).chart?.origin).toBeUndefined();
   });
@@ -84,7 +85,7 @@ describe('analyzeFlowReducer', () => {
     expect(analyzing).toBe(current);
   });
 
-  it('lands a Rejection while keeping the Chart', () => {
+  it('lands a Rejection on a supplied Chart while keeping the Chart', () => {
     const current = { ...initialAnalyzeFlowState, phase: 'analyzing' as const, chart };
 
     expect(
@@ -96,6 +97,26 @@ describe('analyzeFlowReducer', () => {
       ...current,
       phase: 'rejected',
       rejection: 'The price labels are too blurry to read.',
+    });
+  });
+
+  /* Nobody handed us this image, so the Rejection screen would blame the user
+     for our own drawing. It is a failure we own, and the Chart stays put with
+     its origin, so retrying costs one tap. */
+  it('turns a Rejection on a drawn Chart into a failure we own', () => {
+    const current = { ...initialAnalyzeFlowState, phase: 'analyzing' as const, chart: drawnChart };
+
+    /* Nothing lands in `rejection`, so the Rejection screen has nothing to show
+       and never appears. */
+    expect(
+      analyzeFlowReducer(current, {
+        type: 'reject',
+        reason: 'The price labels are too blurry to read.',
+      }),
+    ).toEqual({
+      ...current,
+      phase: 'failed',
+      error: DRAWN_CHART_UNREADABLE,
     });
   });
 

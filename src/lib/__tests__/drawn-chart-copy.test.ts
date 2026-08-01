@@ -1,6 +1,7 @@
 import { TIME_RESOLUTIONS } from '../chart-origin';
 import {
   DRAWING_FAILED,
+  DRAWN_CHART_UNREADABLE,
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
   NOT_ENOUGH_MARKET_DATA,
@@ -39,9 +40,16 @@ describe('the messages a failed drawing shows', () => {
       MARKET_DATA_UNREADABLE,
       NOT_ENOUGH_MARKET_DATA,
       DRAWING_FAILED,
+      DRAWN_CHART_UNREADABLE,
     ]) {
       expect(message).toMatch(/try again/i);
       expect(message).not.toMatch(/your chart|your image|you picked/i);
     }
+  });
+
+  /* The AI failing to read our own drawing is our defect, so the message says
+     we drew it - never that the picture was bad. */
+  it('owns a drawing the AI could not read', () => {
+    expect(DRAWN_CHART_UNREADABLE).toMatch(/^we couldn't draw/i);
   });
 });

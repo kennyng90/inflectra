@@ -37,7 +37,10 @@ export default function AnalyzeScreen() {
   const rejected = phase === 'rejected';
   const failed = phase === 'failed';
   const cameraOff = captureNote?.status === 'blocked';
-  const note = captureNote?.message;
+  /* One line, and the newest thing to say wins it: sourcing and analyzing both
+     clear the capture note first, so a note still standing is the newer of the
+     two - which is how a drawing failure replaces a stale analysis error. */
+  const message = captureNote?.message ?? error;
   /* One Chart at a time: whichever way in is already busy closes all three. */
   const sourcingBlocked = analyzing || drawing;
   /* A rejected Chart can't be analyzed again, and a camera that's off can't
@@ -130,7 +133,7 @@ export default function AnalyzeScreen() {
           />
         ) : (
           <>
-            {(error || note) && (
+            {message && (
               <Text
                 accessibilityRole="alert"
                 style={{
@@ -138,7 +141,7 @@ export default function AnalyzeScreen() {
                   color: theme.colors.textError,
                   textAlign: 'center',
                 }}>
-                {error || note}
+                {message}
               </Text>
             )}
 
