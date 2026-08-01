@@ -1,10 +1,17 @@
 import type { Analysis } from '@/lib/analysis-contract';
 import { ANALYZE_SIGN_IN_ERROR } from '@/lib/analysis-copy';
 import type { AnalyzeProgress } from '@/lib/analyzing-copy';
+import type { ChartOrigin } from '@/lib/chart-origin';
 
 export type AnalyzePhase = 'idle' | 'ready' | 'analyzing' | 'rejected' | 'failed';
 
-export type PickedChart = { uri: string; width: number; height: number };
+export type PickedChart = {
+  uri: string;
+  width: number;
+  height: number;
+  /* Where Inflectra drew it from. Absent means the user supplied the image. */
+  origin?: ChartOrigin;
+};
 
 export type CompletedAnalysis = { analysis: Analysis; chartUri: string };
 

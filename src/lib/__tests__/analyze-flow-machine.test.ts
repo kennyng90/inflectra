@@ -61,6 +61,19 @@ describe('analyzeFlowReducer', () => {
     });
   });
 
+  it('carries a drawn Chart\'s origin through pick', () => {
+    const drawn: PickedChart = {
+      ...chart,
+      origin: { instrument: 'BTC', time_resolution: 'two_days' },
+    };
+
+    const ready = analyzeFlowReducer(initialAnalyzeFlowState, { type: 'pick', chart: drawn });
+
+    expect(ready.chart).toEqual(drawn);
+    /* A supplied Chart says nothing about where it came from. */
+    expect(analyzeFlowReducer(ready, { type: 'pick', chart }).chart?.origin).toBeUndefined();
+  });
+
   it('ignores submit while already analyzing', () => {
     const current = { ...initialAnalyzeFlowState, phase: 'analyzing' as const, chart };
     const analyzing = analyzeFlowReducer(

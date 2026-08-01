@@ -45,5 +45,5 @@ The actionable part of an Analysis: direction (long/short/hold), entry, stop-los
 _Avoid_: trade, signal, advice
 
 **Time resolution**:
-How far back a drawn Chart reaches and how coarse its candles are. There are exactly two, and they are not an arbitrary choice: the market data source picks granularity from the range asked for. Two days in half-hour steps, or thirty days in four-hour steps.
+How far back a drawn Chart reaches and how coarse its candles are. There are exactly two, and they are not an arbitrary choice: the market data source picks granularity from the range asked for, and answers only the ranges on its own list. One day in half-hour steps, or thirty days in four-hour steps. The close-up one is still `two_days` in the contract, named before that list was measured.
 _Avoid_: interval, timeframe, granularity, period

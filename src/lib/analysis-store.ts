@@ -9,6 +9,7 @@ import {
   type Direction,
   type Trend,
 } from '@/lib/analysis-contract';
+import type { ChartOrigin } from '@/lib/chart-origin';
 import {
   HISTORY_DELETE_ERROR,
   HISTORY_ENTRY_LOAD_ERROR,
@@ -86,9 +87,11 @@ export function createAnalysisStore(client: AnalysisStoreClient | null = supabas
 
     removeChart,
 
-    invokeAnalysis(storagePath: string) {
+    /* An origin is only sent for a Chart Inflectra drew: the function reads its
+       absence as the user having supplied the image. */
+    invokeAnalysis(storagePath: string, origin?: ChartOrigin) {
       return client.functions.invoke('analyze-chart', {
-        body: { storage_path: storagePath },
+        body: { storage_path: storagePath, ...origin },
       });
     },
 

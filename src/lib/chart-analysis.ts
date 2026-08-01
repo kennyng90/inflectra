@@ -137,7 +137,7 @@ export async function analyzeChart(
   }
 
   onStep?.('reading');
-  const pending = store.invokeAnalysis(storagePath);
+  const pending = store.invokeAnalysis(storagePath, chart.origin);
 
   if ((await untilCanceled(pending, signal)) === CANCELED) {
     /* The Edge Function runs to the end whatever the app does, and saves the

@@ -12,6 +12,8 @@ import { RejectionNotice } from '@/components/rejection-notice';
 import { ScreenHeader } from '@/components/screen-header';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
+import { useDrawnChartCapture } from '@/lib/drawn-chart-capture';
+import { DRAW_CHART_ACTION } from '@/lib/drawn-chart-copy';
 import { useTheme } from '@/theme';
 
 /* What a failed attempt to source a Chart left behind. */
@@ -25,6 +27,9 @@ export default function AnalyzeScreen() {
   const insets = useSafeAreaInsets();
   const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
   const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
+  /* The drawn Chart needs a view on screen to capture, so the source and the
+     canvas it captures arrive together. */
+  const { drawChart, canvas, busy: drawing } = useDrawnChartCapture();
 
   const analyzing = phase === 'analyzing';
   const rejected = phase === 'rejected';
@@ -64,7 +69,7 @@ export default function AnalyzeScreen() {
       {chart === null ? (
         <EmptyState
           heading="Check your first chart"
-          body="Add a photo or screenshot of a trading chart. The AI reads it and explains what it sees."
+          body="Add a photo or screenshot of a trading chart, or let Inflectra draw one for you. The AI reads it and explains what it sees."
         />
       ) : (
         <View
@@ -144,7 +149,7 @@ export default function AnalyzeScreen() {
               variant={lead === 'camera' ? 'primary' : 'secondary'}
               icon="camera"
               iconFallback="📷"
-              disabled={analyzing}
+              disabled={analyzing || drawing}
               onPress={() => capture(takeChartPhoto)}
             />
             <Button
@@ -152,8 +157,16 @@ export default function AnalyzeScreen() {
               variant={lead === 'library' ? 'primary' : 'secondary'}
               icon="photo.on.rectangle"
               iconFallback="🖼"
-              disabled={analyzing}
+              disabled={analyzing || drawing}
               onPress={() => capture(chooseChartFromLibrary)}
+            />
+            <Button
+              label={drawing ? 'Drawing a chart…' : DRAW_CHART_ACTION}
+              variant="secondary"
+              icon="chart.xyaxis.line"
+              iconFallback="📈"
+              disabled={analyzing || drawing}
+              onPress={() => capture(drawChart)}
             />
 
             {/* Last in the stack: a repair step, not the way forward. */}
@@ -169,6 +182,8 @@ export default function AnalyzeScreen() {
           </>
         )}
       </View>
+
+      {canvas}
     </SafeAreaView>
   );
 }

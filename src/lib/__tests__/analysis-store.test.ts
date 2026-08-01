@@ -1,4 +1,5 @@
 import {
+  createAnalysisStore,
   deleteHistoryEntry,
   fetchHistory,
   fetchSavedAnalysis,
@@ -308,6 +309,41 @@ describe('deleteHistoryEntry', () => {
 
   it('fails when the server connection is not set up', async () => {
     await expect(deleteHistoryEntry(entry.id, null)).rejects.toThrow(/connection/i);
+  });
+});
+
+describe('invokeAnalysis', () => {
+  function fakeInvokeClient() {
+    const invoke = jest.fn().mockResolvedValue({ data: null, error: null });
+    const client = { functions: { invoke } } as unknown as AnalysisStoreClient;
+    return { client, invoke };
+  }
+
+  it('tells the function where a drawn Chart came from', () => {
+    const { client, invoke } = fakeInvokeClient();
+
+    createAnalysisStore(client).invokeAnalysis('user-1/chart-1.jpg', {
+      instrument: 'BTC',
+      time_resolution: 'two_days',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('analyze-chart', {
+      body: {
+        storage_path: 'user-1/chart-1.jpg',
+        instrument: 'BTC',
+        time_resolution: 'two_days',
+      },
+    });
+  });
+
+  it('says nothing about an origin for a Chart the user supplied', () => {
+    const { client, invoke } = fakeInvokeClient();
+
+    createAnalysisStore(client).invokeAnalysis('user-1/chart-1.jpg');
+
+    expect(invoke).toHaveBeenCalledWith('analyze-chart', {
+      body: { storage_path: 'user-1/chart-1.jpg' },
+    });
   });
 });
 
