@@ -25,8 +25,12 @@ The user's saved record of past Analyses. Every Analysis keeps its Chart, suppli
 _Avoid_: log, feed
 
 **Instrument**:
-The tradable thing the user picks when they want a Chart without supplying one. For now BTC and ETH, priced in NOK, because those are what the user trades and what has the volume to make a Pattern mean something. Stocks are deliberately out of scope.
+The tradable thing the user picks when they want a Chart without supplying one. The list is whatever Firi quotes in NOK - nine of them today - because an Analysis of something the user cannot buy where they trade is a suggestion they cannot act on. Priced in NOK. Stocks are deliberately out of scope. A stablecoin is listed, because Firi sells it, but cannot be analyzed: its chart is a flat line and there is no shape to read.
 _Avoid_: ticker, symbol, asset (the AI's `asset_guess` is a guess about one Chart, not an Instrument), coin, pair
+
+**Market**:
+The list of Instruments with what each costs right now, in kroner, and how its price has moved. It is the app's home screen: the first thing you see, and where an Analysis is asked for. Prices follow the wider market rather than any one exchange's order book, and the app says so.
+_Avoid_: watchlist, portfolio, feed, ticker list
 
 **Pattern**:
 A named chart formation the AI detected (e.g. ascending triangle), with a confidence score.
