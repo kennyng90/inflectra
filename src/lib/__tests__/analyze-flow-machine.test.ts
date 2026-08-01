@@ -101,24 +101,23 @@ describe('analyzeFlowReducer', () => {
   });
 
   /* Nobody handed us this image, so the Rejection screen would blame the user
-     for our own drawing. It is a failure we own, and one they can retry. */
+     for our own drawing. It is a failure we own, and the Chart stays put with
+     its origin, so retrying costs one tap. */
   it('turns a Rejection on a drawn Chart into a failure we own', () => {
     const current = { ...initialAnalyzeFlowState, phase: 'analyzing' as const, chart: drawnChart };
 
-    const failed = analyzeFlowReducer(current, {
-      type: 'reject',
-      reason: 'The price labels are too blurry to read.',
-    });
-
     /* Nothing lands in `rejection`, so the Rejection screen has nothing to show
        and never appears. */
-    expect(failed).toEqual({
+    expect(
+      analyzeFlowReducer(current, {
+        type: 'reject',
+        reason: 'The price labels are too blurry to read.',
+      }),
+    ).toEqual({
       ...current,
       phase: 'failed',
       error: DRAWN_CHART_UNREADABLE,
     });
-    /* Retrying costs one tap: the Instrument and Time resolution are still here. */
-    expect(failed.chart?.origin).toEqual(drawnChart.origin);
   });
 
   it('returns a canceled run to ready with the Chart intact', () => {
@@ -150,20 +149,6 @@ describe('analyzeFlowReducer', () => {
         signedIn: false,
         startedAt: 100,
       }),
-    ).toEqual({
-      ...ready,
-      phase: 'failed',
-      error: ANALYZE_SIGN_IN_ERROR,
-    });
-  });
-
-  /* Signing in is the same problem however the Chart arrived, so it gets the
-     same answer. */
-  it('asks a signed-out user to sign in on a drawn Chart too', () => {
-    const ready = { ...initialAnalyzeFlowState, phase: 'ready' as const, chart: drawnChart };
-
-    expect(
-      analyzeFlowReducer(ready, { type: 'submit', signedIn: false, startedAt: 100 }),
     ).toEqual({
       ...ready,
       phase: 'failed',

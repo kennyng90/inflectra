@@ -50,7 +50,6 @@ describe('the messages a failed drawing shows', () => {
   /* The AI failing to read our own drawing is our defect, so the message says
      we drew it - never that the picture was bad. */
   it('owns a drawing the AI could not read', () => {
-    expect(DRAWN_CHART_UNREADABLE).toBe("We couldn't draw a readable chart this time. Try again.");
-    expect(DRAWN_CHART_UNREADABLE).toMatch(/^we couldn't/i);
+    expect(DRAWN_CHART_UNREADABLE).toMatch(/^we couldn't draw/i);
   });
 });

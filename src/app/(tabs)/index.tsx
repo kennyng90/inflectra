@@ -35,10 +35,9 @@ export default function AnalyzeScreen() {
   const rejected = phase === 'rejected';
   const failed = phase === 'failed';
   const cameraOff = captureNote?.status === 'blocked';
-  /* One line, and the freshest thing to say wins it. Analyzing clears the
-     capture note first, so a note that survives is newer than any error - which
-     is what stops a stale analysis failure covering up "we couldn't reach the
-     price data" when drawing the next Chart goes wrong. */
+  /* One line, and the newest thing to say wins it: sourcing and analyzing both
+     clear the capture note first, so a note still standing is the newer of the
+     two - which is how a drawing failure replaces a stale analysis error. */
   const message = captureNote?.message ?? error;
   /* One Chart at a time: whichever way in is already busy closes all three. */
   const sourcingBlocked = analyzing || drawing;
