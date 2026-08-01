@@ -6,7 +6,6 @@ import { Platform, useColorScheme } from 'react-native';
 import { useInterFonts } from '@/hooks/use-inter-fonts';
 import { AnalyzeFlowProvider } from '@/lib/analyze-flow';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { MARKET_TITLE } from '@/lib/market-copy';
 import { startServerConnectionCheck } from '@/lib/use-server-connection';
 import { themeForScheme } from '@/theme';
 
@@ -19,13 +18,6 @@ function RootStack() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={session !== null}>
         <Stack.Screen name="(tabs)" />
-        {/* The one screen carrying a native header: it is pushed from the
-            Market rather than landed on, so it needs the way back a header
-            gives it, and the back button names where that is. */}
-        <Stack.Screen
-          name="analyze"
-          options={{ headerShown: true, title: 'Analyze', headerBackTitle: MARKET_TITLE }}
-        />
         <Stack.Screen name="analysis" options={{ presentation: 'modal' }} />
         <Stack.Screen name="history/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />

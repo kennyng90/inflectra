@@ -10,6 +10,9 @@ import { ChartOverlay } from '@/components/chart-overlay';
 import { DrawnChartPicker, OPENS_ON } from '@/components/drawn-chart-picker';
 import { EmptyState } from '@/components/empty-state';
 import { RejectionNotice } from '@/components/rejection-notice';
+import { ScreenHeader } from '@/components/screen-header';
+import { TabScreen } from '@/components/tab-screen';
+import { ANALYZE_TITLE } from '@/lib/analyze-copy';
 import { useAnalyzeFlow } from '@/lib/analyze-flow';
 import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
 import type { DrawnChartPick } from '@/lib/drawn-chart';
@@ -19,14 +22,15 @@ import { useTheme } from '@/theme';
 /* What a failed attempt to source a Chart left behind. */
 type CaptureNote = Extract<CaptureOutcome, { message: string }>;
 
-/* Reached from the Market, never landed on: either carrying the Instrument a
-   card was tapped for, or carrying nothing, which is the way in for a picture
-   of the user's own. */
+/* The leftmost tab, reached two ways: tapped on its own, which is the way in
+   for a picture of the user's own, or landed on from a Market card, carrying
+   the Instrument that card was for. */
 export default function AnalyzeScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { instrument } = useLocalSearchParams<{ instrument?: string }>();
-  /* Pushed above the tab bar, so this bottom inset is the home indicator. */
+  /* A plain view, so it doesn't get the inset iOS gives the first scroll view
+     under the floating tab bar; the padding below has to clear it. */
   const insets = useSafeAreaInsets();
   const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
   const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
@@ -74,14 +78,22 @@ export default function AnalyzeScreen() {
   /* Tapping a card on the Market is the tap that draws, so arriving with an
      Instrument means the Chart is already asked for. It draws at the Time
      resolution the picker opens on, which the picker below then changes in one
-     tap. The ref is what makes it one drawing per arrival rather than one per
-     time the deps settle. */
-  const drawnOnArrival = useRef(false);
+     tap. The tab outlives the visit, so the ask is consumed rather than
+     remembered: clearing the param, and the ref with it, is what makes a second
+     tap on the same card draw again instead of leaving the last Chart up. The
+     ref is what keeps that one drawing per ask rather than one per time the
+     deps settle. */
+  const drawnFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!instrument || drawnOnArrival.current) return;
-    drawnOnArrival.current = true;
+    if (!instrument) {
+      drawnFor.current = null;
+      return;
+    }
+    if (drawnFor.current === instrument) return;
+    drawnFor.current = instrument;
+    router.setParams({ instrument: undefined });
     void draw({ instrument, timeResolution: OPENS_ON });
-  }, [instrument, draw]);
+  }, [instrument, draw, router]);
 
   const analyze = async () => {
     /* Whatever the analysis has to say outranks a stale capture note. */
@@ -95,7 +107,8 @@ export default function AnalyzeScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.backgroundBase }}>
+    <TabScreen>
+      <ScreenHeader title={ANALYZE_TITLE} />
       {chart === null ? (
         <EmptyState
           heading="Check your first chart"
@@ -207,6 +220,6 @@ export default function AnalyzeScreen() {
       </View>
 
       {canvas}
-    </View>
+    </TabScreen>
   );
 }

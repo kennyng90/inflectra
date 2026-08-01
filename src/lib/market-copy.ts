@@ -4,9 +4,6 @@
 import { norwegianNumber } from '@/lib/norwegian-number';
 
 export const MARKET_TITLE = 'Market';
-/* The other way in, kept where it has always been: a picture of the user's own.
-   Second on this screen, not gone from it. */
-export const OWN_CHART_ACTION = 'Use a picture of my own';
 
 /* Shown wherever a price from the wider market is - beside a drawn Analysis and
    on the Market itself - so the levels are never read as the user's exchange.

@@ -1,10 +1,11 @@
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { HistoryRow, THUMBNAIL_WIDTH } from '@/components/history-row';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreen } from '@/components/tab-screen';
 import { useHistory } from '@/lib/use-history';
 import { useTheme } from '@/theme';
 
@@ -98,9 +99,9 @@ export default function HistoryScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.backgroundBase }}>
+    <TabScreen>
       <ScreenHeader title="History" />
       {renderBody()}
-    </SafeAreaView>
+    </TabScreen>
   );
 }

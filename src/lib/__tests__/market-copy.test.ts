@@ -2,7 +2,6 @@ import { DISCLAIMER } from '../analysis-copy';
 import {
   MARKET_PRICE_NOTE,
   MARKET_TITLE,
-  OWN_CHART_ACTION,
   PAST_WEEK,
   PRICES_FAILED_TITLE,
   PRICES_LOADING,
@@ -17,7 +16,6 @@ import {
 
 const EVERY_STRING = [
   MARKET_TITLE,
-  OWN_CHART_ACTION,
   MARKET_PRICE_NOTE,
   PAST_WEEK,
   PRICES_FAILED_TITLE,
@@ -33,11 +31,6 @@ describe('the words the Market uses', () => {
     for (const copy of EVERY_STRING) {
       expect(copy).not.toMatch(/watchlist|portfolio|feed|ticker|sparkline|API|rate limit/i);
     }
-  });
-
-  it('keeps the way in for a picture the user supplies', () => {
-    expect(OWN_CHART_ACTION).toMatch(/my own/i);
-    expect(OWN_CHART_ACTION).not.toMatch(/upload|file|import/i);
   });
 });
 
