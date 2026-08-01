@@ -7,6 +7,7 @@ import {
 import { DRAWING_HEIGHT, DRAWING_WIDTH, MIN_CANDLES, buildDrawnChart } from '../drawn-chart';
 import type { FetchLike } from '../fetch-json';
 import { INSTRUMENT_CATALOGUE } from '../instruments';
+import { PRICES_RATE_LIMITED } from '../market-copy';
 import { UserFacingError } from '../user-facing-error';
 
 /* CoinGecko answers [openTimeMs, open, high, low, close]. */
@@ -46,8 +47,12 @@ function datedOf(time: number): string {
   return `${dayOf(time)} ${new Date(time).getFullYear()}`;
 }
 
-function stubFetch(body: unknown, ok = true): jest.MockedFunction<FetchLike> {
-  return jest.fn(async (_url: string) => ({ ok, json: async () => body }));
+function stubFetch(body: unknown, ok = true, status = ok ? 200 : 500) {
+  return jest.fn(async (_url: string) => ({
+    ok,
+    status,
+    json: async () => body,
+  })) as jest.MockedFunction<FetchLike>;
 }
 
 /* Whatever the user picked: the assertions below are about the drawing, not
@@ -268,6 +273,15 @@ describe('buildDrawnChart', () => {
       throw new TypeError('Network request failed');
     }) as unknown as FetchLike;
     await expect(buildDrawnChart(PICK, offline)).rejects.toThrow(MARKET_DATA_UNREACHABLE);
+  });
+
+  /* Opening the Market and tapping a card asks the same price source twice in a
+     breath, so this refusal is a live one - and telling someone whose
+     connection is fine to check it is the one message that cannot help. */
+  it('tells being asked to wait apart from being unable to reach anything', async () => {
+    await expect(buildDrawnChart(PICK, stubFetch(candles(), false, 429))).rejects.toThrow(
+      PRICES_RATE_LIMITED,
+    );
   });
 
   it('fails on an answer it cannot read rather than drawing half a Chart', async () => {

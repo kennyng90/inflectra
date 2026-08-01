@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelRatio, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 
@@ -36,7 +36,10 @@ export function useDrawnChartCapture() {
     mountedRef.current = null;
   }, [onCanvas]);
 
-  const drawChart = async (pick: DrawnChartPick): Promise<CaptureOutcome> => {
+  /* Memoized on nothing but state setters and refs, all of which are stable:
+     the Analyze screen calls this from an effect when it arrives carrying an
+     Instrument, and that effect has to be able to name what it depends on. */
+  const drawChart = useCallback(async (pick: DrawnChartPick): Promise<CaptureOutcome> => {
     setBusy(true);
     try {
       const chart = await buildDrawnChart(pick);
@@ -62,7 +65,7 @@ export function useDrawnChartCapture() {
     } finally {
       setBusy(false);
     }
-  };
+  }, []);
 
   /* Kept off-screen rather than hidden: a view with nothing to show has nothing
      to capture. */

@@ -1,5 +1,6 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
+import { MARKET_TITLE } from '@/lib/market-copy';
 import { useTheme } from '@/theme';
 
 export default function TabsLayout() {
@@ -12,7 +13,7 @@ export default function TabsLayout() {
       tintColor={theme.colors.interactiveAction}
       labelStyle={{ color: theme.colors.textWeak, selected: { color: theme.colors.interactiveAction } }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Analyze</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{MARKET_TITLE}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="chart.line.uptrend.xyaxis" md="monitoring" />
       </NativeTabs.Trigger>
 

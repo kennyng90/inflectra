@@ -29,9 +29,10 @@ import { useTheme } from '@/theme';
    bound. */
 const LIST_MAX_HEIGHT = 240;
 
-/* Where a first opening starts. The wider view is the one that shows a shape at
-   a glance, so the close-up is the deliberate ask rather than the default. */
-const OPENS_ON: TimeResolution = 'thirty_days';
+/* Where a first opening starts, and what a tap on the Market draws at, since
+   that tap does not stop to ask. The wider view is the one that shows a shape
+   at a glance, so the close-up is the deliberate ask rather than the default. */
+export const OPENS_ON: TimeResolution = 'thirty_days';
 
 type DrawnChartPickerProps = {
   /* A drawing this opened is still being made. */
