@@ -75,6 +75,7 @@ export default function SavedAnalysisScreen() {
         analysis={saved.analysis}
         chartUri={saved.chartUrl}
         chartCacheKey={saved.storagePath}
+        drawn={Boolean(saved.origin)}
         footer={
           <View
             style={{

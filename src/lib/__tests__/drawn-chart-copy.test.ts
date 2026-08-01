@@ -1,8 +1,10 @@
+import { DISCLAIMER } from '../analysis-copy';
 import { TIME_RESOLUTIONS } from '../chart-origin';
 import {
   DRAWING_FAILED,
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
+  MARKET_PRICE_NOTE,
   NOT_ENOUGH_MARKET_DATA,
   TIME_RESOLUTION_COPY,
   drawnChartTitle,
@@ -29,6 +31,22 @@ describe('TIME_RESOLUTION_COPY', () => {
 describe('drawnChartTitle', () => {
   it('names the Instrument and what its prices are in', () => {
     expect(drawnChartTitle('Bitcoin')).toBe('Bitcoin in kroner (NOK)');
+  });
+});
+
+describe('MARKET_PRICE_NOTE', () => {
+  it("warns that the prices are the wider market, not the user's exchange", () => {
+    expect(MARKET_PRICE_NOTE).toMatch(/wider market/i);
+    expect(MARKET_PRICE_NOTE).toMatch(/exchange/i);
+  });
+
+  it('says nothing the disclaimer says, so it can never stand in for it', () => {
+    expect(MARKET_PRICE_NOTE).not.toMatch(/advice|inflectra/i);
+    expect(MARKET_PRICE_NOTE).not.toBe(DISCLAIMER);
+  });
+
+  it('names no index, no feed and no ticker', () => {
+    expect(MARKET_PRICE_NOTE).not.toMatch(/index|aggregat|order book|spread|oracle/i);
   });
 });
 

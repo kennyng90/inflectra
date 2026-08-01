@@ -13,6 +13,7 @@ import {
   formatPrice,
   type LadderRung,
 } from '@/lib/analysis-copy';
+import { MARKET_PRICE_NOTE } from '@/lib/drawn-chart-copy';
 import { useTheme, type Theme } from '@/theme';
 
 /* Sizes with no token behind them: a chart strip wide enough to recognise but
@@ -43,10 +44,12 @@ function ChartStrip({
   uri,
   cacheKey,
   assetGuess,
+  drawn,
 }: {
   uri: string | null;
   cacheKey?: string;
   assetGuess: string;
+  drawn: boolean;
 }) {
   const theme = useTheme();
 
@@ -56,43 +59,62 @@ function ChartStrip({
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: theme.colors.strokeWeak,
       }}>
-      <Image
-        accessibilityLabel="The chart you analyzed"
-        source={uri ? { uri, cacheKey } : null}
-        contentFit="contain"
-        style={{
-          width: '100%',
-          aspectRatio: CHART_ASPECT_RATIO,
-          backgroundColor: theme.colors.backgroundAlternate,
-        }}
-      />
-      {uri === null && (
+      {/* The image and what sits on top of it: the pill and the didn't-load
+          message are placed against this, not against the note below. */}
+      <View>
+        <Image
+          accessibilityLabel="The chart you analyzed"
+          source={uri ? { uri, cacheKey } : null}
+          contentFit="contain"
+          style={{
+            width: '100%',
+            aspectRatio: CHART_ASPECT_RATIO,
+            backgroundColor: theme.colors.backgroundAlternate,
+          }}
+        />
+        {uri === null && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: theme.spacing.space20,
+              },
+            ]}>
+            <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak, textAlign: 'center' }}>
+              The chart didn&apos;t load, but the analysis of it is below.
+            </Text>
+          </View>
+        )}
         <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: theme.spacing.space20,
-            },
-          ]}>
-          <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak, textAlign: 'center' }}>
-            The chart didn&apos;t load, but the analysis of it is below.
-          </Text>
+          style={{
+            position: 'absolute',
+            top: theme.spacing.space12,
+            left: theme.spacing.space12,
+          }}>
+          <Pill
+            fill={theme.colors.fillStrong}
+            color={theme.colors.backgroundBase}
+            label={assetGuess}
+          />
+        </View>
+      </View>
+
+      {/* Where the prices came from belongs to the Chart, so it is read before
+          the levels below and never in place of the disclaimer at the foot. */}
+      {drawn && (
+        <View
+          style={{
+            backgroundColor: theme.colors.backgroundAlternate,
+            paddingHorizontal: theme.spacing.space20,
+            paddingVertical: theme.spacing.space8,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: theme.colors.strokeWeak,
+          }}>
+          <Note>{MARKET_PRICE_NOTE}</Note>
         </View>
       )}
-      <View
-        style={{
-          position: 'absolute',
-          top: theme.spacing.space12,
-          left: theme.spacing.space12,
-        }}>
-        <Pill
-          fill={theme.colors.fillStrong}
-          color={theme.colors.backgroundBase}
-          label={assetGuess}
-        />
-      </View>
     </View>
   );
 }
@@ -248,11 +270,15 @@ export function AnalysisView({
   /* Keyed by storage path for a saved Chart, whose signed URL changes every
      time it is opened and would otherwise re-download. */
   chartCacheKey,
+  /* True for a Chart Inflectra drew: its prices follow the wider market, which
+     is the one thing a drawn Analysis says that a supplied one cannot. */
+  drawn = false,
   footer,
 }: {
   analysis: Analysis;
   chartUri: string | null;
   chartCacheKey?: string;
+  drawn?: boolean;
   footer?: ReactNode;
 }) {
   const theme = useTheme();
@@ -263,7 +289,12 @@ export function AnalysisView({
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing.space32 }}>
-      <ChartStrip uri={chartUri} cacheKey={chartCacheKey} assetGuess={analysis.asset_guess} />
+      <ChartStrip
+        uri={chartUri}
+        cacheKey={chartCacheKey}
+        assetGuess={analysis.asset_guess}
+        drawn={drawn}
+      />
 
       <View style={{ padding: theme.spacing.space20, gap: theme.spacing.space16 }}>
         <View

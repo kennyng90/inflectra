@@ -13,7 +13,13 @@ export type PickedChart = {
   origin?: ChartOrigin;
 };
 
-export type CompletedAnalysis = { analysis: Analysis; chartUri: string };
+/* The Chart is gone from the flow by the time this is read, so the Analysis
+   keeps what the screen still needs: the image, and where it was drawn from. */
+export type CompletedAnalysis = {
+  analysis: Analysis;
+  chartUri: string;
+  origin?: ChartOrigin;
+};
 
 export type AnalyzeFlowState = {
   phase: AnalyzePhase;
@@ -31,7 +37,7 @@ export type AnalyzeFlowEvent =
   | { type: 'cancel' }
   | { type: 'fail'; message: string }
   | { type: 'progress'; progress: AnalyzeProgress }
-  | { type: 'complete'; analysis: Analysis; chartUri: string };
+  | { type: 'complete'; analysis: Analysis; chart: PickedChart };
 
 export const initialAnalyzeFlowState: AnalyzeFlowState = {
   phase: 'idle',
@@ -98,7 +104,11 @@ export function analyzeFlowReducer(
         ...state,
         phase: 'idle',
         chart: null,
-        completed: { analysis: event.analysis, chartUri: event.chartUri },
+        completed: {
+          analysis: event.analysis,
+          chartUri: event.chart.uri,
+          origin: event.chart.origin,
+        },
       };
   }
 }

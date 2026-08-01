@@ -12,8 +12,12 @@ export const MAX_INSTRUMENT_LENGTH = 32;
 export const timeResolutionSchema = z.enum(TIME_RESOLUTIONS);
 export const instrumentSchema = z.string().trim().min(1).max(MAX_INSTRUMENT_LENGTH);
 
+/* An origin is a pair: an Instrument without a Time resolution says nothing
+   about what the Chart covers, so half of one is no origin at all. */
+export const chartOriginSchema = z.object({
+  instrument: instrumentSchema,
+  time_resolution: timeResolutionSchema,
+});
+
 export type TimeResolution = (typeof TIME_RESOLUTIONS)[number];
-export type ChartOrigin = {
-  instrument: string;
-  time_resolution: TimeResolution;
-};
+export type ChartOrigin = z.infer<typeof chartOriginSchema>;

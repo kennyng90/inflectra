@@ -37,14 +37,21 @@ const analysis = {
   },
 };
 
+/* A Chart the user supplied: the AI guessed at what it showed and nothing on the
+   row says where it came from. */
 const row = (overrides: Partial<HistoryRecord> = {}): HistoryRecord => ({
   id: 'row-1',
   asset_guess: 'BTC/USD 4h',
   storage_path: 'user-1/chart-1.jpg',
   created_at: '2026-07-25T09:00:00.000Z',
   analysis,
+  instrument: null,
+  time_resolution: null,
   ...overrides,
 });
+
+const drawnRow = (overrides: Partial<HistoryRecord> = {}): HistoryRecord =>
+  row({ instrument: 'BTC', time_resolution: 'thirty_days', ...overrides });
 
 type QueryResult = { data: unknown; error: unknown };
 type SignResult = { data: { path: string | null; signedUrl: string }[] | null; error: unknown };
@@ -63,13 +70,29 @@ describe('toHistoryEntry', () => {
   it('keeps only what the list shows', () => {
     expect(toHistoryEntry(row())).toEqual({
       id: 'row-1',
-      assetGuess: 'BTC/USD 4h',
+      label: 'BTC/USD 4h',
       storagePath: 'user-1/chart-1.jpg',
       createdAt: '2026-07-25T09:00:00.000Z',
       trend: 'bullish',
       direction: 'long',
       thumbnailUrl: null,
     });
+  });
+
+  it('labels a drawn Analysis with the Instrument rather than the guess', () => {
+    expect(toHistoryEntry(drawnRow())?.label).toBe('BTC');
+  });
+
+  it('lists a row saved before an origin could be recorded', () => {
+    const older: HistoryRecord = {
+      id: 'row-1',
+      asset_guess: 'BTC/USD 4h',
+      storage_path: 'user-1/chart-1.jpg',
+      created_at: '2026-07-25T09:00:00.000Z',
+      analysis,
+    };
+
+    expect(toHistoryEntry(older)?.label).toBe('BTC/USD 4h');
   });
 
   it('drops a row whose saved Analysis no longer reads', () => {
@@ -104,7 +127,8 @@ describe('fetchHistory', () => {
       ['user-1/chart-1.jpg', 'user-1/chart-2.jpg'],
       expect.any(Number),
     );
-    expect(select).toHaveBeenCalled();
+    /* The Instrument is on the row, so the list has to ask for it. */
+    expect(select).toHaveBeenCalledWith(expect.stringContaining('instrument'));
     expect(entries.map((entry) => entry.id)).toEqual(['row-1', 'row-2']);
     expect(entries.map((entry) => entry.thumbnailUrl)).toEqual([
       'https://signed/1',
@@ -189,7 +213,25 @@ describe('fetchSavedAnalysis', () => {
       createdAt: '2026-07-25T09:00:00.000Z',
       analysis,
       chartUrl: 'https://signed/1',
+      origin: null,
     });
+  });
+
+  it('reads back where a drawn Chart came from', async () => {
+    const { client } = fakeEntryClient({ data: drawnRow(), error: null });
+
+    await expect(fetchSavedAnalysis('row-1', client)).resolves.toMatchObject({
+      origin: { instrument: 'BTC', time_resolution: 'thirty_days' },
+    });
+  });
+
+  it('opens a row whose origin is half-written as one the user supplied', async () => {
+    const { client } = fakeEntryClient({
+      data: drawnRow({ time_resolution: null }),
+      error: null,
+    });
+
+    await expect(fetchSavedAnalysis('row-1', client)).resolves.toMatchObject({ origin: null });
   });
 
   it('still opens the Analysis when signing the Chart fails', async () => {
