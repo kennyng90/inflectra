@@ -6,6 +6,11 @@ import {
   analysisResultSchema,
   type AnalysisResult,
 } from '../_shared/analysis-contract.ts';
+import {
+  instrumentSchema,
+  timeResolutionSchema,
+  type ChartOrigin,
+} from '../_shared/chart-origin.ts';
 import type { Database } from '../_shared/database.types.ts';
 import { SYSTEM_PROMPT, USER_INSTRUCTION } from './prompt.ts';
 
@@ -44,6 +49,28 @@ function mediaTypeOf(contentType: string, path: string) {
   return MEDIA_TYPES[contentType.split(';')[0].trim().toLowerCase()] ?? MEDIA_TYPES[extension];
 }
 
+/* An origin is a pair, so half of one is refused rather than written: an
+   Instrument without a Time resolution says nothing about what the Chart
+   covers. Neither is an origin at all - the user supplied the Chart. */
+function readOrigin(body: {
+  instrument?: unknown;
+  time_resolution?: unknown;
+}): { origin: ChartOrigin | null } | { message: string } {
+  if (body.instrument == null && body.time_resolution == null) return { origin: null };
+
+  const instrument = instrumentSchema.safeParse(body.instrument);
+  if (!instrument.success) {
+    return { message: "We couldn't tell which instrument this chart is for. Try again." };
+  }
+
+  const timeResolution = timeResolutionSchema.safeParse(body.time_resolution);
+  if (!timeResolution.success) {
+    return { message: "We couldn't tell what time range this chart covers. Try again." };
+  }
+
+  return { origin: { instrument: instrument.data, time_resolution: timeResolution.data } };
+}
+
 export default {
   fetch: withSupabase<Database>({ auth: 'user' }, async (req, ctx) => {
     const userId = ctx.userClaims?.id;
@@ -53,6 +80,11 @@ export default {
     const storagePath = typeof body?.storage_path === 'string' ? body.storage_path.trim() : '';
     if (!storagePath) {
       return errorResponse('invalid_request', 'Pick a chart image to analyze.', 400);
+    }
+
+    const parsedOrigin = readOrigin(body);
+    if ('message' in parsedOrigin) {
+      return errorResponse('invalid_request', parsedOrigin.message, 400);
     }
 
     /* RLS-scoped client: a path outside the caller's folder reads as missing. */
@@ -146,6 +178,8 @@ export default {
       storage_path: storagePath,
       asset_guess: result.asset_guess,
       analysis: result,
+      instrument: parsedOrigin.origin?.instrument ?? null,
+      time_resolution: parsedOrigin.origin?.time_resolution ?? null,
     });
     if (insertError) {
       console.error('analyze-chart: saving the Analysis failed', insertError);

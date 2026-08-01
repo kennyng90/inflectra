@@ -1,6 +1,7 @@
 import { assertEquals, assertExists } from '@std/assert';
 import { describe, it } from '@std/testing/bdd';
 import { type Analysis, analysisResultSchema } from '../../_shared/analysis-contract.ts';
+import { MAX_INSTRUMENT_LENGTH } from '../../_shared/chart-origin.ts';
 import {
   anthropicResponse,
   setupSupabaseEnv,
@@ -81,6 +82,85 @@ describe('analyze-chart', () => {
     assertEquals(row.storage_path, STORAGE_PATH);
     assertEquals(row.asset_guess, 'BTC/USD 4h');
     assertEquals(row.analysis, VALID_ANALYSIS);
+    assertEquals(row.instrument, null);
+    assertEquals(row.time_resolution, null);
+  });
+
+  it('saves the Chart origin when the body carries one', async () => {
+    const token = await signUserJwt(USER_ID);
+    const { response, stub } = await callFunction({
+      token,
+      body: { storage_path: STORAGE_PATH, instrument: 'BTCNOK', time_resolution: 'thirty_days' },
+      anthropic: () => anthropicResponse(VALID_ANALYSIS),
+    });
+
+    assertEquals(response.status, 200);
+    const row = JSON.parse(stub.callsTo('/rest/v1/analyses')[0].body!);
+    assertEquals(row.instrument, 'BTCNOK');
+    assertEquals(row.time_resolution, 'thirty_days');
+  });
+
+  it('refuses a Time resolution it does not recognise before calling the AI', async () => {
+    const token = await signUserJwt(USER_ID);
+    const { response, stub } = await callFunction({
+      token,
+      body: { storage_path: STORAGE_PATH, instrument: 'BTCNOK', time_resolution: 'one_year' },
+      anthropic: unexpectedAnthropicCall,
+    });
+
+    assertEquals(response.status, 400);
+    assertEquals((await response.json()).error.code, 'invalid_request');
+    assertEquals(stub.calls.length, 0);
+  });
+
+  it('refuses an over-long Instrument before calling the AI', async () => {
+    const token = await signUserJwt(USER_ID);
+    const { response, stub } = await callFunction({
+      token,
+      body: {
+        storage_path: STORAGE_PATH,
+        instrument: 'B'.repeat(MAX_INSTRUMENT_LENGTH + 1),
+        time_resolution: 'two_days',
+      },
+      anthropic: unexpectedAnthropicCall,
+    });
+
+    assertEquals(response.status, 400);
+    assertEquals((await response.json()).error.code, 'invalid_request');
+    assertEquals(stub.calls.length, 0);
+  });
+
+  it('refuses an Instrument that is not a string before calling the AI', async () => {
+    const token = await signUserJwt(USER_ID);
+    const { response, stub } = await callFunction({
+      token,
+      body: { storage_path: STORAGE_PATH, instrument: 42, time_resolution: 'two_days' },
+      anthropic: unexpectedAnthropicCall,
+    });
+
+    assertEquals(response.status, 400);
+    assertEquals((await response.json()).error.code, 'invalid_request');
+    assertEquals(stub.calls.length, 0);
+  });
+
+  it('refuses either half of an origin on its own before calling the AI', async () => {
+    const token = await signUserJwt(USER_ID);
+    const halves = [
+      { storage_path: STORAGE_PATH, instrument: 'BTCNOK' },
+      { storage_path: STORAGE_PATH, time_resolution: 'two_days' },
+    ];
+
+    for (const body of halves) {
+      const { response, stub } = await callFunction({
+        token,
+        body,
+        anthropic: unexpectedAnthropicCall,
+      });
+
+      assertEquals(response.status, 400);
+      assertEquals((await response.json()).error.code, 'invalid_request');
+      assertEquals(stub.calls.length, 0);
+    }
   });
 
   it('returns the Rejection and saves nothing when the image is not a Chart', async () => {

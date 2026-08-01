@@ -40,7 +40,9 @@ export type Database = {
           asset_guess: string
           created_at: string
           id: string
+          instrument: string | null
           storage_path: string
+          time_resolution: string | null
           user_id: string
         }
         Insert: {
@@ -48,7 +50,9 @@ export type Database = {
           asset_guess: string
           created_at?: string
           id?: string
+          instrument?: string | null
           storage_path: string
+          time_resolution?: string | null
           user_id: string
         }
         Update: {
@@ -56,7 +60,9 @@ export type Database = {
           asset_guess?: string
           created_at?: string
           id?: string
+          instrument?: string | null
           storage_path?: string
+          time_resolution?: string | null
           user_id?: string
         }
         Relationships: []
