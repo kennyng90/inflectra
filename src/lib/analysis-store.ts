@@ -178,8 +178,6 @@ export function toHistoryEntry(row: HistoryRecord): HistoryEntry | null {
 
   return {
     id: row.id,
-    /* The Instrument is what the Chart is of; `asset_guess` is only the AI's
-       reading of one image, so the fact wins where there is one. */
     label: toChartOrigin(row)?.instrument ?? row.asset_guess,
     storagePath: row.storage_path,
     createdAt: row.created_at,
