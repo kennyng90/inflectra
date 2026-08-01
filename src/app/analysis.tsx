@@ -13,7 +13,11 @@ export default function AnalysisScreen() {
 
   return (
     <ModalScreen title="Analysis" onDone={() => router.back()}>
-      <AnalysisView analysis={completed.analysis} chartUri={completed.chartUri} />
+      <AnalysisView
+        analysis={completed.analysis}
+        chartUri={completed.chartUri}
+        drawn={Boolean(completed.origin)}
+      />
     </ModalScreen>
   );
 }

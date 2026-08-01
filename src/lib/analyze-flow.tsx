@@ -71,7 +71,7 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'reject', reason: result.reason });
         return false;
       }
-      dispatch({ type: 'complete', analysis: result, chartUri: chart.uri });
+      dispatch({ type: 'complete', analysis: result, chart });
       return true;
     } catch (error) {
       if (isAnalysisCanceled(error)) {

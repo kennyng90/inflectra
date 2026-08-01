@@ -48,7 +48,7 @@ export function HistoryRow({ entry }: { entry: HistoryEntry }) {
     <OpacityPressable
       accessible
       accessibilityRole="button"
-      accessibilityLabel={`${entry.assetGuess}. ${direction}. ${trendCopy[entry.trend].label}. ${date}.`}
+      accessibilityLabel={`${entry.label}. ${direction}. ${trendCopy[entry.trend].label}. ${date}.`}
       accessibilityHint="Opens the full analysis"
       /* Rows sit edge to edge, so any slop would reach into the neighbour. */
       hitSlop={0}
@@ -84,7 +84,7 @@ export function HistoryRow({ entry }: { entry: HistoryEntry }) {
             fontWeight: theme.fontWeight.medium,
             color: theme.colors.textStrong,
           }}>
-          {entry.assetGuess}
+          {entry.label}
         </Text>
         <Text numberOfLines={1} style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>
           <Text

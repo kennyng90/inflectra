@@ -9,7 +9,7 @@ import {
   type Direction,
   type Trend,
 } from '@/lib/analysis-contract';
-import type { ChartOrigin } from '@/lib/chart-origin';
+import { chartOriginSchema, type ChartOrigin } from '@/lib/chart-origin';
 import {
   HISTORY_DELETE_ERROR,
   HISTORY_ENTRY_LOAD_ERROR,
@@ -26,14 +26,17 @@ import {
 
 const CHART_BUCKET = 'charts';
 const ANALYSIS_TABLE = 'analyses';
-const LISTED_COLUMNS = 'id, asset_guess, storage_path, analysis, created_at';
+const LISTED_COLUMNS =
+  'id, asset_guess, storage_path, analysis, created_at, instrument, time_resolution';
 /* Each History visit signs fresh URLs. This keeps leaked URLs short-lived. */
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const CHART_CONTENT_TYPE = 'image/jpeg';
 
 export type HistoryEntry = {
   id: string;
-  assetGuess: string;
+  /* The Instrument where the row has one - a fact - and otherwise the AI's
+     guess at what the Chart showed. */
+  label: string;
   storagePath: string;
   createdAt: string;
   trend: Trend;
@@ -47,6 +50,10 @@ export type HistoryRecord = {
   storage_path: string;
   created_at: string;
   analysis: unknown;
+  /* Absent on a row saved before a Chart could say where it came from, null on
+     one the user supplied. */
+  instrument?: string | null;
+  time_resolution?: string | null;
 };
 
 export type SavedAnalysis = {
@@ -56,6 +63,8 @@ export type SavedAnalysis = {
   analysis: Analysis;
   /* Null when the Chart couldn't be signed; the Analysis still opens. */
   chartUrl: string | null;
+  /* Null when the user supplied the Chart. */
+  origin: ChartOrigin | null;
 };
 
 /* Only what a row shows, read loosely so an Analysis saved under an older
@@ -153,13 +162,23 @@ export function createAnalysisStore(client: AnalysisStoreClient | null = supabas
 
 export type AnalysisStore = ReturnType<typeof createAnalysisStore>;
 
+/* Read as loosely as the list itself: a row saved before these columns existed
+   simply has no origin, which is what a Chart the user supplied has too. */
+function toChartOrigin(row: HistoryRecord): ChartOrigin | null {
+  const parsed = chartOriginSchema.safeParse({
+    instrument: row.instrument,
+    time_resolution: row.time_resolution,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
 export function toHistoryEntry(row: HistoryRecord): HistoryEntry | null {
   const parsed = listedAnalysisSchema.safeParse(row.analysis);
   if (!parsed.success) return null;
 
   return {
     id: row.id,
-    assetGuess: row.asset_guess,
+    label: toChartOrigin(row)?.instrument ?? row.asset_guess,
     storagePath: row.storage_path,
     createdAt: row.created_at,
     trend: parsed.data.trend,
@@ -226,6 +245,7 @@ export async function fetchSavedAnalysis(
     createdAt: row.created_at,
     analysis: parsed.data,
     chartUrl: signed.data?.signedUrl ?? null,
+    origin: toChartOrigin(row),
   };
 }
 

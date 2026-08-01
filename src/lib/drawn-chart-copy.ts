@@ -19,6 +19,12 @@ export const DRAWING_FAILED = "We couldn't draw a chart just now. Try again.";
    drawing, so it reads as ours to fix rather than as a Rejection. */
 export const DRAWN_CHART_UNREADABLE = "We couldn't draw a readable chart this time. Try again.";
 
+/* Shown beside a drawn Chart, never instead of the disclaimer every Analysis
+   carries: the prices come from the wider market rather than the user's own
+   exchange, so the levels are indicative and not something to trade off blind. */
+export const MARKET_PRICE_NOTE =
+  'Prices here follow the wider market, so they can differ a little from your exchange.';
+
 export type TimeResolutionCopy = {
   /* What the choice is called. */
   label: string;
