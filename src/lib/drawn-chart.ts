@@ -8,12 +8,16 @@ import {
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
   NOT_ENOUGH_MARKET_DATA,
-  TIME_RESOLUTION_COPY,
+  drawnChartSubtitle,
   drawnChartTitle,
+  kronerLabel,
 } from '@/lib/drawn-chart-copy';
 import { fetchJson, type FetchLike } from '@/lib/fetch-json';
 import { instrumentFor, type Instrument } from '@/lib/instruments';
 import { UserFacingError } from '@/lib/user-facing-error';
+/* The scale itself, not a theme: the geometry is the same in light and dark,
+   and this module has no component to read `useTheme()` from. */
+import { spacing } from '@/theme/tokens';
 
 export type DrawnChartPick = { instrument: string; timeResolution: TimeResolution };
 
@@ -35,17 +39,25 @@ const QUOTE_CURRENCY = 'nok';
 /* Fewer than this and there is no shape to read, only noise. */
 export const MIN_CANDLES = 24;
 
-/* The drawing's own coordinate space. The renderer scales it to the device, so
-   these are the numbers every coordinate below is expressed in. */
-export const DRAWING_WIDTH = 1000;
-export const DRAWING_HEIGHT = 640;
-/* Room for the title above, the price labels to the right, the dates below. */
-const PADDING = { top: 116, right: 128, bottom: 72, left: 56 };
+/* The drawing's own coordinate space, in the theme's units: the renderer halves
+   it on the way to the device, so a heading here reads as half a heading beside
+   the Chart, which is the size an axis wants and a screen never asks for.
+   Every distance inside it comes off the spacing scale. */
+export const DRAWING_WIDTH = 720;
+export const DRAWING_HEIGHT = 480;
+/* Room for the title above, the price labels to the right, the dates below.
+   The right has to hold the widest price label the canvas will draw there. */
+const PADDING = {
+  top: spacing.space80,
+  right: spacing.space128,
+  bottom: spacing.space40,
+  left: spacing.space24,
+};
 
 const PRICE_TICK_COUNT = 5;
 const TIME_TICK_COUNT = 5;
 /* A candle that opened and closed at the same price still has to be visible. */
-const MIN_BODY_HEIGHT = 2;
+const MIN_BODY_HEIGHT = spacing.space2;
 const BODY_WIDTH_RATIO = 0.7;
 
 export type DrawnCandle = {
@@ -111,21 +123,32 @@ async function fetchCandles(url: string, fetchImpl: FetchLike): Promise<Candle[]
   return candles;
 }
 
-/* Coarser as the price grows, so a label never runs into the one beside it. */
-function priceDecimals(price: number): number {
-  if (price >= 1000) return 0;
-  if (price >= 10) return 1;
-  return 4;
+/* Long labels crowd the axis, so there is a ceiling on how fine one gets. */
+const MAX_PRICE_DECIMALS = 4;
+
+/* One precision for the whole price axis, chosen from the gap between two
+   ticks rather than from how big the numbers are: a stable Instrument's whole
+   range can sit inside an øre, where a krone-precise label repeats itself five
+   times and the axis stops being something a level can be checked against. */
+function priceDecimals(highest: number, span: number): number {
+  const gap = span / (PRICE_TICK_COUNT - 1);
+  /* A market that never moved has no gap to resolve, only a size. */
+  if (gap <= 0) return highest >= 1000 ? 0 : 2;
+  return Math.min(Math.max(Math.ceil(-Math.log10(gap)), 0), MAX_PRICE_DECIMALS);
 }
 
 /* Norwegian numbers: space between thousands, comma before decimals. */
-function formatPrice(price: number): string {
-  const [whole, fraction] = price.toFixed(priceDecimals(price)).split('.');
+function formatPrice(price: number, decimals: number): string {
+  const [whole, fraction] = price.toFixed(decimals).split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return fraction ? `${grouped},${fraction}` : grouped;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function day(at: Date): string {
+  return `${at.getDate()} ${MONTHS[at.getMonth()]}`;
+}
 
 /* Half-hour candles are read as a time of day; a month of them as a date. */
 function formatTime(time: number, timeResolution: TimeResolution): string {
@@ -133,7 +156,22 @@ function formatTime(time: number, timeResolution: TimeResolution): string {
   if (timeResolution === 'two_days') {
     return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
   }
-  return `${at.getDate()} ${MONTHS[at.getMonth()]}`;
+  return day(at);
+}
+
+function dated(at: Date): string {
+  return `${day(at)} ${at.getFullYear()}`;
+}
+
+/* The days the candles cover, for someone reading the image on its own: the
+   year always, since nothing else in the picture can supply it, and the
+   start's year only where it differs from the end's. */
+function formatDays(from: number, to: number): string {
+  const start = new Date(from);
+  const end = new Date(to);
+  if (dated(start) === dated(end)) return dated(end);
+  const sameYear = start.getFullYear() === end.getFullYear();
+  return `${sameYear ? day(start) : dated(start)} – ${dated(end)}`;
 }
 
 /* Evenly spaced positions across `count` items, ends included. */
@@ -183,9 +221,13 @@ function layout(
     };
   });
 
+  const decimals = priceDecimals(highest, span);
   const priceTicks = Array.from({ length: PRICE_TICK_COUNT }, (_, index) => {
     const price = highest - (span * index) / (PRICE_TICK_COUNT - 1);
-    return { price, label: formatPrice(price), y: y(price) };
+    const amount = formatPrice(price, decimals);
+    /* Only the top of the column carries the unit: on every tick it would be
+       four repetitions of a fact one statement settles. */
+    return { price, label: index === 0 ? kronerLabel(amount) : amount, y: y(price) };
   });
 
   const timeTicks = spread(candles.length, TIME_TICK_COUNT).map((index) => ({
@@ -195,7 +237,10 @@ function layout(
 
   return {
     title: drawnChartTitle(instrument.name),
-    subtitle: TIME_RESOLUTION_COPY[timeResolution].onChart,
+    subtitle: drawnChartSubtitle(
+      formatDays(candles[0].time, candles[candles.length - 1].time),
+      timeResolution,
+    ),
     size: { width: DRAWING_WIDTH, height: DRAWING_HEIGHT },
     plot,
     candles: drawn,

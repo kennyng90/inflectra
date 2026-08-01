@@ -3,31 +3,26 @@ import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
 import type { DrawnChart } from '@/lib/drawn-chart';
 import { useTheme } from '@/theme';
 
-/* Type sizes and offsets are in the drawing's own coordinate space, which the
-   Svg scales to the device - not the theme's device-pixel type scale. They fit
-   the padding `drawn-chart` reserves around the plot. */
-const TITLE_SIZE = 36;
-const TITLE_BASELINE = 56;
-const SUBTITLE_SIZE = 24;
-const SUBTITLE_BASELINE = 94;
-const AXIS_LABEL_SIZE = 22;
-/* Price labels start just right of the plot, dropped to sit on their own line. */
-const PRICE_LABEL_GAP = 12;
-const PRICE_LABEL_DROP = 8;
-/* Dates hang below the plot floor. */
-const TIME_LABEL_DROP = 40;
+/* A line, which no scale has an opinion about. */
 const HAIRLINE = 1;
 /* A wick is a fraction of its candle's width, and never thinner than a line. */
 const WICK_WIDTH_RATIO = 0.16;
 
-/* Draws what `drawn-chart` worked out. Every number here comes from the
-   geometry, so this stays a pure picture of it: no fetching, no maths, nothing
-   worth a test that a look at the screen would not answer better. */
+/* Draws what `drawn-chart` worked out. Every number here is either geometry
+   from that module or a value from the theme, so the Chart reads as part of the
+   app and this stays a pure picture of the data: no fetching, no maths, nothing
+   worth a test that a look at the screen would not answer better.
+
+   The type sits in the drawing's coordinate space, which the Svg halves on the
+   way to the device - a heading here is half a heading beside the Chart, which
+   is the size an axis label wants. The offsets have to stay inside the padding
+   `drawn-chart` reserves around the plot. */
 export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: number }) {
   const theme = useTheme();
   const { plot, size } = chart;
   const height = (width * size.height) / size.width;
   const font = theme.fontFamily.sans;
+  const axisSize = theme.fontSize.tiny;
 
   return (
     <Svg width={width} height={height} viewBox={`0 0 ${size.width} ${size.height}`}>
@@ -35,18 +30,18 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
 
       <SvgText
         x={plot.x}
-        y={TITLE_BASELINE}
+        y={theme.spacing.space32}
         fontFamily={font}
-        fontSize={TITLE_SIZE}
+        fontSize={theme.fontSize.heading3}
         fontWeight={theme.fontWeight.strong}
         fill={theme.colors.textStrong}>
         {chart.title}
       </SvgText>
       <SvgText
         x={plot.x}
-        y={SUBTITLE_BASELINE}
+        y={theme.spacing.space56}
         fontFamily={font}
-        fontSize={SUBTITLE_SIZE}
+        fontSize={theme.fontSize.small}
         fill={theme.colors.textWeak}>
         {chart.subtitle}
       </SvgText>
@@ -63,11 +58,12 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
             stroke={theme.colors.strokeWeak}
             strokeWidth={HAIRLINE}
           />
+          {/* Just right of the plot, dropped to sit on its own line. */}
           <SvgText
-            x={plot.x + plot.width + PRICE_LABEL_GAP}
-            y={tick.y + PRICE_LABEL_DROP}
+            x={plot.x + plot.width + theme.spacing.space8}
+            y={tick.y + theme.spacing.space4}
             fontFamily={font}
-            fontSize={AXIS_LABEL_SIZE}
+            fontSize={axisSize}
             fill={theme.colors.textWeak}>
             {tick.label}
           </SvgText>
@@ -97,14 +93,18 @@ export function DrawnChartCanvas({ chart, width }: { chart: DrawnChart; width: n
         );
       })}
 
+      {/* Dates hang below the plot floor. The ends are anchored inwards, so the
+          first and last never hang off the drawing. */}
       {chart.timeTicks.map((tick, index) => (
         <SvgText
           key={`time-${index}`}
           x={tick.x}
-          y={plot.y + plot.height + TIME_LABEL_DROP}
-          textAnchor="middle"
+          y={plot.y + plot.height + theme.spacing.space24}
+          textAnchor={
+            index === 0 ? 'start' : index === chart.timeTicks.length - 1 ? 'end' : 'middle'
+          }
           fontFamily={font}
-          fontSize={AXIS_LABEL_SIZE}
+          fontSize={axisSize}
           fill={theme.colors.textWeak}>
           {tick.label}
         </SvgText>

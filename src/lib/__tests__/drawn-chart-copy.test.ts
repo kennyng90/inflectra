@@ -8,6 +8,7 @@ import {
   MARKET_PRICE_NOTE,
   NOT_ENOUGH_MARKET_DATA,
   TIME_RESOLUTION_COPY,
+  drawnChartSubtitle,
   drawnChartTitle,
 } from '../drawn-chart-copy';
 
@@ -17,8 +18,8 @@ describe('TIME_RESOLUTION_COPY', () => {
       const copy = TIME_RESOLUTION_COPY[resolution];
       expect(copy.label.length).toBeGreaterThan(0);
       expect(copy.detail).toMatch(/steps$/);
-      expect(copy.onChart).toMatch(/steps$/);
-      expect(`${copy.label} ${copy.detail} ${copy.onChart}`).not.toMatch(/\d+[hm]\b|interval|granular/i);
+      expect(copy.step).toMatch(/steps$/);
+      expect(`${copy.label} ${copy.detail} ${copy.step}`).not.toMatch(/\d+[hm]\b|interval|granular/i);
     }
   });
 
@@ -32,6 +33,19 @@ describe('TIME_RESOLUTION_COPY', () => {
 describe('drawnChartTitle', () => {
   it('names the Instrument and what its prices are in', () => {
     expect(drawnChartTitle('Bitcoin')).toBe('Bitcoin in kroner (NOK)');
+  });
+});
+
+describe('drawnChartSubtitle', () => {
+  /* The dates are what makes a saved Chart still say what it is: "thirty days"
+     alone is only true on the day it was drawn. */
+  it('says which days the Chart covers and how long each candle is', () => {
+    expect(drawnChartSubtitle('2 Jul – 1 Aug 2026', 'thirty_days')).toBe(
+      '2 Jul – 1 Aug 2026, in four-hour steps',
+    );
+    expect(drawnChartSubtitle('1 Aug 2026', 'two_days')).toBe(
+      '1 Aug 2026, in half-hour steps',
+    );
   });
 });
 

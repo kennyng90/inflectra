@@ -30,8 +30,8 @@ export type TimeResolutionCopy = {
   label: string;
   /* What picking it gets you, in plain words. */
   detail: string;
-  /* Written onto the Chart, so a saved image still says what it covers. */
-  onChart: string;
+  /* How much trading one candle covers, said the way the Chart says it. */
+  step: string;
 };
 
 export const TIME_RESOLUTION_COPY: Record<TimeResolution, TimeResolutionCopy> = {
@@ -40,12 +40,12 @@ export const TIME_RESOLUTION_COPY: Record<TimeResolution, TimeResolutionCopy> = 
   two_days: {
     label: 'Close up',
     detail: 'One day of trading, in half-hour steps',
-    onChart: 'One day, in half-hour steps',
+    step: 'half-hour steps',
   },
   thirty_days: {
     label: 'Wide view',
     detail: 'One month of trading, in four-hour steps',
-    onChart: 'Thirty days, in four-hour steps',
+    step: 'four-hour steps',
   },
 };
 
@@ -53,4 +53,17 @@ export const TIME_RESOLUTION_COPY: Record<TimeResolution, TimeResolutionCopy> = 
    reader, NOK for the AI. */
 export function drawnChartTitle(instrumentName: string): string {
   return `${instrumentName} in kroner (NOK)`;
+}
+
+/* Under the title: which days are drawn and how much of one a candle is. The
+   dates are what "Thirty days" cannot say once the day it was drawn on has
+   passed, which is the whole point of writing this into the image. */
+export function drawnChartSubtitle(days: string, timeResolution: TimeResolution): string {
+  return `${days}, in ${TIME_RESOLUTION_COPY[timeResolution].step}`;
+}
+
+/* The price axis says its unit once, at the top, so a level read off the
+   middle of it is still a number of kroner and not of anything else. */
+export function kronerLabel(amount: string): string {
+  return `${amount} kr`;
 }
