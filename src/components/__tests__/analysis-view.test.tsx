@@ -1,18 +1,14 @@
-/* Tests here target logic, not components - this one is the exception, because
-   the thing to hold is that the market-price note is shown alongside the
+/* Tests here target logic, not components - this is one of the few exceptions,
+   because the thing to hold is that the market-price note is shown alongside the
    disclaimer and never in place of it, which only the rendered screen can say.
    It asserts strings, never structure or pixels. */
-import {
-  act,
-  create,
-  type ReactTestRenderer,
-  type ReactTestRendererJSON,
-} from 'react-test-renderer';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { AnalysisView } from '../analysis-view';
 import type { Analysis } from '@/lib/analysis-contract';
 import { DISCLAIMER } from '@/lib/analysis-copy';
 import { MARKET_PRICE_NOTE } from '@/lib/drawn-chart-copy';
+import { renderedTexts } from '@/test-support/rendered-text';
 
 const analysis: Analysis = {
   is_chart: true,
@@ -35,15 +31,6 @@ const analysis: Analysis = {
   },
 };
 
-type Rendered = ReactTestRendererJSON | ReactTestRendererJSON[] | null;
-
-function textsIn(node: Rendered | string): string[] {
-  if (typeof node === 'string') return [node];
-  if (node === null) return [];
-  if (Array.isArray(node)) return node.flatMap(textsIn);
-  return (node.children ?? []).flatMap(textsIn);
-}
-
 /* Every string the screen renders, whatever it is nested in. */
 function texts(drawn: boolean): string[] {
   let renderer!: ReactTestRenderer;
@@ -52,7 +39,7 @@ function texts(drawn: boolean): string[] {
       <AnalysisView analysis={analysis} chartUri="https://signed/1" drawn={drawn} />,
     );
   });
-  return textsIn(renderer.toJSON());
+  return renderedTexts(renderer);
 }
 
 describe('AnalysisView', () => {

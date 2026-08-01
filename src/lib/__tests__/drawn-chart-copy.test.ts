@@ -29,11 +29,11 @@ describe('TIME_RESOLUTION_COPY', () => {
     expect(TIME_RESOLUTION_COPY.thirty_days.detail).toMatch(/month/i);
   });
 
-  /* Two choices side by side are only a choice if they read differently. */
+  /* Choices side by side are only a choice if they read differently. */
   it('gives each one its own words', () => {
-    const [first, second] = TIME_RESOLUTIONS.map((resolution) => TIME_RESOLUTION_COPY[resolution]);
-    expect(first.label).not.toBe(second.label);
-    expect(first.detail).not.toBe(second.detail);
+    const copies = TIME_RESOLUTIONS.map((resolution) => TIME_RESOLUTION_COPY[resolution]);
+    expect(new Set(copies.map((copy) => copy.label)).size).toBe(copies.length);
+    expect(new Set(copies.map((copy) => copy.detail)).size).toBe(copies.length);
   });
 });
 

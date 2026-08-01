@@ -1,17 +1,18 @@
-/* Tests here target logic, not components - this one is the exception, because
-   what has to hold is that both Time resolutions are offered in plain words and
-   that a mistaken tap is one tap to undo, and a pick only exists on the screen
-   it is made on. It asserts strings and the pick that comes out, never pixels. */
-import {
-  act,
-  create,
-  type ReactTestRenderer,
-  type ReactTestRendererJSON,
-} from 'react-test-renderer';
+/* Tests here target logic, not components - this is one of the few exceptions,
+   because what has to hold is that both Time resolutions are offered in plain
+   words, that the one showing is the one drawn at, and that a mistaken tap costs
+   a single tap to undo. Only the opened dialog can say any of that. It asserts
+   strings and the pick that comes out, never pixels. */
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { DrawnChartPicker } from '../drawn-chart-picker';
 import type { DrawnChartPick } from '@/lib/drawn-chart';
-import { PICK_TIME_RESOLUTION_TITLE, TIME_RESOLUTION_COPY } from '@/lib/drawn-chart-copy';
+import {
+  DRAW_CHART_ACTION,
+  PICK_TIME_RESOLUTION_TITLE,
+  TIME_RESOLUTION_COPY,
+} from '@/lib/drawn-chart-copy';
+import { renderedTexts } from '@/test-support/rendered-text';
 
 /* The Instruments on offer are Firi's answer, and this is not the test of that. */
 jest.mock('@/lib/instruments', () => ({
@@ -23,15 +24,6 @@ jest.mock('@/lib/instruments', () => ({
 
 const CLOSE_UP = TIME_RESOLUTION_COPY.two_days;
 const WIDE_VIEW = TIME_RESOLUTION_COPY.thirty_days;
-
-type Rendered = ReactTestRendererJSON | ReactTestRendererJSON[] | null;
-
-function textsIn(node: Rendered | string): string[] {
-  if (typeof node === 'string') return [node];
-  if (node === null) return [];
-  if (Array.isArray(node)) return node.flatMap(textsIn);
-  return (node.children ?? []).flatMap(textsIn);
-}
 
 /* Mounts the picker and drives it the way a thumb does: by the label. */
 function mount() {
@@ -54,13 +46,12 @@ function mount() {
     });
   };
 
-  /* Every string the dialog renders, in the order it is read. */
-  return { picks, press, shown: () => textsIn(renderer.toJSON()) };
+  return { picks, press, shown: () => renderedTexts(renderer) };
 }
 
 async function opened() {
   const picker = mount();
-  await picker.press('Draw a chart for me');
+  await picker.press(DRAW_CHART_ACTION);
   return picker;
 }
 
@@ -123,7 +114,7 @@ describe('DrawnChartPicker', () => {
     await picker.press(CLOSE_UP.label);
     await picker.press('Bitcoin');
 
-    await picker.press('Draw a chart for me');
+    await picker.press(DRAW_CHART_ACTION);
     await picker.press('Ethereum');
 
     expect(picker.picks.at(-1)).toEqual({ instrument: 'ETH', timeResolution: 'two_days' });
