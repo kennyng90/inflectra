@@ -10,10 +10,11 @@ import {
   NOT_ENOUGH_MARKET_DATA,
   drawnChartSubtitle,
   drawnChartTitle,
-  kronerLabel,
 } from '@/lib/drawn-chart-copy';
 import { fetchJson, type FetchLike } from '@/lib/fetch-json';
 import { instrumentFor, type Instrument } from '@/lib/instruments';
+import { PRICES_RATE_LIMITED, kronerLabel } from '@/lib/market-copy';
+import { norwegianNumber } from '@/lib/norwegian-number';
 import { UserFacingError } from '@/lib/user-facing-error';
 /* The scale itself, not a theme: the geometry is the same in light and dark,
    and this module has no component to read `useTheme()` from. */
@@ -112,6 +113,10 @@ async function fetchCandles(url: string, fetchImpl: FetchLike): Promise<Candle[]
   const payload = await fetchJson(url, fetchImpl, {
     unreachable: MARKET_DATA_UNREACHABLE,
     unreadable: MARKET_DATA_UNREADABLE,
+    /* Opening the Market and tapping a card is two calls to the same price
+       source in a breath, so this refusal is a live one, and "check your
+       connection" is the wrong thing to tell someone whose connection is fine. */
+    rateLimited: PRICES_RATE_LIMITED,
   });
 
   const candles = toCandles(payload);
@@ -131,13 +136,6 @@ function priceAxisDecimals(highest: number, span: number): number {
   /* A market that never moved has no gap to resolve, only a size. */
   if (gap <= 0) return highest >= 1000 ? 0 : 2;
   return Math.min(Math.max(Math.ceil(-Math.log10(gap)), 0), MAX_PRICE_DECIMALS);
-}
-
-/* Norwegian numbers: space between thousands, comma before decimals. */
-function formatPrice(price: number, decimals: number): string {
-  const [whole, fraction] = price.toFixed(decimals).split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return fraction ? `${grouped},${fraction}` : grouped;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -221,7 +219,7 @@ function layout(
   const decimals = priceAxisDecimals(highest, span);
   const priceTicks = Array.from({ length: PRICE_TICK_COUNT }, (_, index) => {
     const price = highest - (span * index) / (PRICE_TICK_COUNT - 1);
-    const amount = formatPrice(price, decimals);
+    const amount = norwegianNumber(price, decimals);
     /* Only the top of the column carries the unit: on every tick it would be
        four repetitions of a fact one statement settles. */
     return { price, label: index === 0 ? kronerLabel(amount) : amount, y: y(price) };

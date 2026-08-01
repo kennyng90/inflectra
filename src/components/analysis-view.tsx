@@ -13,7 +13,7 @@ import {
   formatPrice,
   type LadderRung,
 } from '@/lib/analysis-copy';
-import { MARKET_PRICE_NOTE } from '@/lib/drawn-chart-copy';
+import { MARKET_PRICE_NOTE } from '@/lib/market-copy';
 import { useTheme, type Theme } from '@/theme';
 
 /* Sizes with no token behind them: a chart strip wide enough to recognise but

@@ -1,11 +1,9 @@
-import { DISCLAIMER } from '../analysis-copy';
 import { TIME_RESOLUTIONS } from '../chart-origin';
 import {
   DRAWING_FAILED,
   DRAWN_CHART_UNREADABLE,
   MARKET_DATA_UNREACHABLE,
   MARKET_DATA_UNREADABLE,
-  MARKET_PRICE_NOTE,
   NOT_ENOUGH_MARKET_DATA,
   PICK_TIME_RESOLUTION_TITLE,
   TIME_RESOLUTION_COPY,
@@ -63,22 +61,6 @@ describe('drawnChartSubtitle', () => {
     expect(drawnChartSubtitle('1 Aug 2026', 'two_days')).toBe(
       '1 Aug 2026, in half-hour steps',
     );
-  });
-});
-
-describe('MARKET_PRICE_NOTE', () => {
-  it("warns that the prices are the wider market, not the user's exchange", () => {
-    expect(MARKET_PRICE_NOTE).toMatch(/wider market/i);
-    expect(MARKET_PRICE_NOTE).toMatch(/exchange/i);
-  });
-
-  it('says nothing the disclaimer says, so it can never stand in for it', () => {
-    expect(MARKET_PRICE_NOTE).not.toMatch(/advice|inflectra/i);
-    expect(MARKET_PRICE_NOTE).not.toBe(DISCLAIMER);
-  });
-
-  it('names no index, no feed and no ticker', () => {
-    expect(MARKET_PRICE_NOTE).not.toMatch(/index|aggregat|order book|spread|oracle/i);
   });
 });
 

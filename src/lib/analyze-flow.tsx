@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useReducer, useRef, type ReactNode } from 'react';
 
 import { isRejection } from '@/lib/analysis-contract';
 import {
@@ -45,7 +45,10 @@ export function AnalyzeFlowProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(analyzeFlowReducer, initialAnalyzeFlowState);
   const runRef = useRef<AbortController | null>(null);
 
-  const pickChart = (chart: PickedChart) => dispatch({ type: 'pick', chart });
+  /* The one callback here that is memoized, because the Analyze screen reaches
+     it from an effect that draws a Chart on arrival: an effect's dependency
+     list only means something if what it lists can stay the same. */
+  const pickChart = useCallback((chart: PickedChart) => dispatch({ type: 'pick', chart }), []);
 
   const submit = async (): Promise<boolean> => {
     if (!state.chart || state.phase === 'analyzing' || runRef.current) return false;

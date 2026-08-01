@@ -7,7 +7,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { AnalysisView } from '../analysis-view';
 import type { Analysis } from '@/lib/analysis-contract';
 import { DISCLAIMER } from '@/lib/analysis-copy';
-import { MARKET_PRICE_NOTE } from '@/lib/drawn-chart-copy';
+import { MARKET_PRICE_NOTE } from '@/lib/market-copy';
 import { renderedTexts } from '@/test-support/rendered-text';
 
 const analysis: Analysis = {

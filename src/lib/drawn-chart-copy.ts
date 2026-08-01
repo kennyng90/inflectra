@@ -19,12 +19,6 @@ export const DRAWING_FAILED = "We couldn't draw a chart just now. Try again.";
    drawing, so it reads as ours to fix rather than as a Rejection. */
 export const DRAWN_CHART_UNREADABLE = "We couldn't draw a readable chart this time. Try again.";
 
-/* Shown beside a drawn Chart, never instead of the disclaimer every Analysis
-   carries: the prices come from the wider market rather than the user's own
-   exchange, so the levels are indicative and not something to trade off blind. */
-export const MARKET_PRICE_NOTE =
-  'Prices here follow the wider market, so they can differ a little from your exchange.';
-
 /* Heads the two Time resolutions where they are offered. The question is what
    the user is actually deciding; how coarse the steps come out is the price
    data's answer to it, not theirs, so that is left to the detail on each one. */
@@ -65,10 +59,4 @@ export function drawnChartTitle(instrumentName: string): string {
    passed, which is the whole point of writing this into the image. */
 export function drawnChartSubtitle(days: string, timeResolution: TimeResolution): string {
   return `${days}, in ${TIME_RESOLUTION_COPY[timeResolution].step}`;
-}
-
-/* The price axis says its unit once, at the top, so a level read off the
-   middle of it is still a number of kroner and not of anything else. */
-export function kronerLabel(amount: string): string {
-  return `${amount} kr`;
 }

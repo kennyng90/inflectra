@@ -1,7 +1,7 @@
-import type { FetchLike } from '../fetch-json';
 import { INSTRUMENT_LIST_UNAVAILABLE } from '../instrument-copy';
 import { INSTRUMENT_CATALOGUE, fetchInstruments, instrumentFor } from '../instruments';
 import { UserFacingError } from '../user-facing-error';
+import { offlineFetch, stubFetch } from '@/test-support/stub-fetch';
 
 /* Firi answers one row per market, named by the pair with no separator, and
    quotes several currencies. Measured 2026-08-01: eleven markets, nine of them
@@ -28,10 +28,6 @@ const FIRI_MARKETS = [
   'BTCNOK',
   'ETHNOK',
 ].map(market);
-
-function stubFetch(body: unknown, ok = true): jest.MockedFunction<FetchLike> {
-  return jest.fn(async (_url: string) => ({ ok, json: async () => body }));
-}
 
 const symbolsOf = (instruments: { symbol: string }[]) => instruments.map((one) => one.symbol);
 
@@ -82,14 +78,11 @@ describe('fetchInstruments', () => {
   });
 
   it('fails when the list cannot be reached', async () => {
-    await expect(fetchInstruments(stubFetch(FIRI_MARKETS, false))).rejects.toThrow(
+    await expect(fetchInstruments(stubFetch(FIRI_MARKETS, { ok: false }))).rejects.toThrow(
       INSTRUMENT_LIST_UNAVAILABLE,
     );
 
-    const offline = jest.fn(async () => {
-      throw new TypeError('Network request failed');
-    }) as unknown as FetchLike;
-    await expect(fetchInstruments(offline)).rejects.toThrow(INSTRUMENT_LIST_UNAVAILABLE);
+    await expect(fetchInstruments(offlineFetch())).rejects.toThrow(INSTRUMENT_LIST_UNAVAILABLE);
   });
 
   it('fails on an answer it cannot read rather than offering half a list', async () => {

@@ -1,191 +1,139 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Linking, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnalyzingProgress } from '@/components/analyzing-progress';
-import { Button, BUTTON_HEIGHT } from '@/components/button';
-import { ChartOverlay } from '@/components/chart-overlay';
-import { DrawnChartPicker } from '@/components/drawn-chart-picker';
+import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
-import { RejectionNotice } from '@/components/rejection-notice';
+import { MarketRow } from '@/components/market-row';
 import { ScreenHeader } from '@/components/screen-header';
-import { useAnalyzeFlow } from '@/lib/analyze-flow';
-import { chooseChartFromLibrary, takeChartPhoto, type CaptureOutcome } from '@/lib/chart-capture';
-import type { DrawnChartPick } from '@/lib/drawn-chart';
-import { useDrawnChartCapture } from '@/lib/drawn-chart-capture';
+import {
+  MARKET_PRICE_NOTE,
+  MARKET_TITLE,
+  OWN_CHART_ACTION,
+  PRICES_FAILED_TITLE,
+  PRICES_LOADING,
+  PRICES_RETRY,
+} from '@/lib/market-copy';
+import { useMarket } from '@/lib/use-market';
 import { useTheme } from '@/theme';
 
-/* What a failed attempt to source a Chart left behind. */
-type CaptureNote = Extract<CaptureOutcome, { message: string }>;
-
-export default function AnalyzeScreen() {
+/* The app's home screen: every Instrument, what it costs right now in kroner,
+   how it has moved this week, and the week's shape. Tapping one is the ask for
+   an Analysis; supplying a picture of your own is the other way in, and it is
+   on this screen rather than behind it. */
+export default function MarketScreen() {
   const theme = useTheme();
   const router = useRouter();
-  /* Native tabs give each screen its own SafeAreaProvider, so this bottom inset
-     already covers the floating tab bar. Only scroll views get it for free. */
+  /* The list clears the floating tab bar on its own (iOS adjusts the first
+     scroll view's insets); the retry block below is a plain view and doesn't. */
   const insets = useSafeAreaInsets();
-  const { phase, chart, rejection, error, progress, pickChart, submit, cancel } = useAnalyzeFlow();
-  const [captureNote, setCaptureNote] = useState<CaptureNote | null>(null);
-  /* The drawn Chart needs a view on screen to capture, so the source and the
-     canvas it captures arrive together. */
-  const { drawChart, canvas, busy: drawing } = useDrawnChartCapture();
+  const { quotes, error, refreshing, refresh, retry } = useMarket();
 
-  const analyzing = phase === 'analyzing';
-  const rejected = phase === 'rejected';
-  const failed = phase === 'failed';
-  const cameraOff = captureNote?.status === 'blocked';
-  /* One line, and the newest thing to say wins it: sourcing and analyzing both
-     clear the capture note first, so a note still standing is the newer of the
-     two - which is how a drawing failure replaces a stale analysis error. */
-  const message = captureNote?.message ?? error;
-  /* One Chart at a time: whichever way in is already busy closes all three. */
-  const sourcingBlocked = analyzing || drawing;
-  /* A rejected Chart can't be analyzed again, and a camera that's off can't
-     take one, so whichever action can still move the user on leads. */
-  const lead = chart !== null && !rejected ? 'analyze' : cameraOff ? 'library' : 'camera';
-  /* The actions area holds two stacked buttons' worth of height in every phase,
-     so the Chart preview above it never jumps when an overlay appears. */
-  const actionsMinHeight = BUTTON_HEIGHT * 2 + theme.spacing.space12;
+  /* The tap on a card is the tap that draws, so the Instrument travels with the
+     route and the Analyze screen has nothing left to ask. */
+  const analyzeDrawn = (instrument: string) =>
+    router.push({ pathname: '/analyze', params: { instrument } });
 
-  const capture = async (source: () => Promise<CaptureOutcome>) => {
-    setCaptureNote(null);
-    const outcome = await source();
-    if (outcome.status === 'canceled') return;
-    if (outcome.status === 'picked') pickChart(outcome.chart);
-    else setCaptureNote(outcome);
-  };
+  const renderBody = () => {
+    /* Nothing to show and a reason why: the whole screen is the failure. A
+       failure with prices already on it is a line in the list header instead. */
+    if (quotes === null && error !== null) {
+      return (
+        <>
+          <EmptyState heading={PRICES_FAILED_TITLE} body={error} />
+          <View
+            style={{
+              padding: theme.spacing.space20,
+              paddingBottom: insets.bottom + theme.spacing.space32,
+              gap: theme.spacing.space12,
+            }}>
+            <Button
+              label={PRICES_RETRY}
+              icon="arrow.clockwise"
+              iconFallback="↻"
+              onPress={retry}
+            />
+            <OwnPictureButton />
+          </View>
+        </>
+      );
+    }
 
-  /* Both halves of the pick are the user's; the screen only carries it. */
-  const draw = (pick: DrawnChartPick) => capture(() => drawChart(pick));
+    if (quotes === null) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator
+            accessibilityLabel={PRICES_LOADING}
+            size="large"
+            color={theme.colors.interactiveAction}
+          />
+        </View>
+      );
+    }
 
-  const analyze = async () => {
-    /* Whatever the analysis has to say outranks a stale capture note. */
-    setCaptureNote(null);
-    if (await submit()) router.push('/analysis');
-  };
-
-  const openSettings = () => {
-    /* react-native-web has no openSettings, and no web pick can be blocked. */
-    if (Platform.OS !== 'web') Linking.openSettings();
+    return (
+      <FlatList
+        data={quotes}
+        keyExtractor={(quote) => quote.instrument.symbol}
+        renderItem={({ item }) => (
+          <MarketRow quote={item} onPick={() => analyzeDrawn(item.instrument.symbol)} />
+        )}
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing.space20,
+          paddingBottom: theme.spacing.space24,
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={theme.colors.textWeak}
+          />
+        }
+        ListHeaderComponent={
+          <View style={{ gap: theme.spacing.space8, paddingBottom: theme.spacing.space8 }}>
+            <OwnPictureButton />
+            {/* A refresh that failed on top of prices already shown. */}
+            {error && (
+              <Text
+                accessibilityRole="alert"
+                style={{
+                  ...theme.text.tiny,
+                  color: theme.colors.textError,
+                  textAlign: 'center',
+                }}>
+                {error}
+              </Text>
+            )}
+            {/* Directly above the first price, because it is about all of them. */}
+            <Text style={{ ...theme.text.tiny, color: theme.colors.textWeak }}>
+              {MARKET_PRICE_NOTE}
+            </Text>
+          </View>
+        }
+      />
+    );
   };
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.colors.backgroundBase }}>
-      <ScreenHeader title="Analyze" />
-
-      {chart === null ? (
-        <EmptyState
-          heading="Check your first chart"
-          body="Add a photo or screenshot of a trading chart, or let Inflectra draw one for you. The AI reads it and explains what it sees."
-        />
-      ) : (
-        <View
-          style={{
-            flex: 1,
-            paddingHorizontal: theme.spacing.space20,
-            paddingTop: theme.spacing.space8,
-          }}>
-          <Image
-            accessibilityLabel="The chart you picked"
-            source={{ uri: chart.uri }}
-            contentFit="contain"
-            style={{
-              flex: 1,
-              borderRadius: theme.radius.r12,
-              backgroundColor: theme.colors.backgroundAlternate,
-              opacity: analyzing || rejected ? 0.3 : 1,
-            }}
-          />
-          {analyzing && (
-            <ChartOverlay>
-              <AnalyzingProgress progress={progress} />
-            </ChartOverlay>
-          )}
-          {rejected && (
-            <ChartOverlay>
-              <RejectionNotice reason={rejection} />
-            </ChartOverlay>
-          )}
-        </View>
-      )}
-
-      <View
-        style={{
-          padding: theme.spacing.space20,
-          paddingBottom: insets.bottom + theme.spacing.space32,
-          gap: theme.spacing.space12,
-          justifyContent: 'flex-end',
-          ...(chart === null ? {} : { minHeight: actionsMinHeight }),
-        }}>
-        {analyzing ? (
-          <Button
-            label="Cancel"
-            variant="secondary"
-            icon="xmark"
-            iconFallback="✕"
-            onPress={cancel}
-          />
-        ) : (
-          <>
-            {message && (
-              <Text
-                accessibilityRole="alert"
-                style={{
-                  ...theme.text.small,
-                  color: theme.colors.textError,
-                  textAlign: 'center',
-                }}>
-                {message}
-              </Text>
-            )}
-
-            {/* Kept mounted while analyzing so the preview doesn't jump; the
-                overlay carries the progress, so no second spinner here. */}
-            {lead === 'analyze' && (
-              <Button
-                label={failed ? 'Try again' : 'Analyze this chart'}
-                icon={failed ? 'arrow.clockwise' : 'sparkles'}
-                iconFallback={failed ? '↻' : '✨'}
-                disabled={analyzing}
-                onPress={analyze}
-              />
-            )}
-
-            <Button
-              label="Take a photo"
-              variant={lead === 'camera' ? 'primary' : 'secondary'}
-              icon="camera"
-              iconFallback="📷"
-              disabled={sourcingBlocked}
-              onPress={() => capture(takeChartPhoto)}
-            />
-            <Button
-              label="Choose from photos"
-              variant={lead === 'library' ? 'primary' : 'secondary'}
-              icon="photo.on.rectangle"
-              iconFallback="🖼"
-              disabled={sourcingBlocked}
-              onPress={() => capture(chooseChartFromLibrary)}
-            />
-            <DrawnChartPicker busy={drawing} disabled={sourcingBlocked} onPick={draw} />
-
-            {/* Last in the stack: a repair step, not the way forward. */}
-            {cameraOff && !analyzing && (
-              <Button
-                label="Open Settings"
-                variant="secondary"
-                icon="gearshape"
-                iconFallback="⚙︎"
-                onPress={openSettings}
-              />
-            )}
-          </>
-        )}
-      </View>
-
-      {canvas}
+      <ScreenHeader title={MARKET_TITLE} />
+      {renderBody()}
     </SafeAreaView>
+  );
+}
+
+/* The other way to a Chart, offered whether or not the prices loaded: a failed
+   price load must not take the camera down with it. */
+function OwnPictureButton() {
+  const router = useRouter();
+
+  return (
+    <Button
+      label={OWN_CHART_ACTION}
+      variant="secondary"
+      icon="camera"
+      iconFallback="📷"
+      onPress={() => router.push('/analyze')}
+    />
   );
 }
